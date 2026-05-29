@@ -1,0 +1,127 @@
+:root {
+  color-scheme: dark;
+  --bg: #0d1117;
+  --panel: #161b22;
+  --border: #30363d;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --accent: #4f9dff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+#app {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+header {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+header h1 {
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+#status {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+#score {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.1rem;
+}
+
+main {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+#board canvas {
+  border-radius: 12px;
+  display: block;
+}
+
+#panel {
+  flex: 1;
+  min-width: 280px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+#panel h2 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin: 16px 0 6px;
+}
+
+#panel section:first-child h2,
+#panel section[data-phase] h2:first-of-type {
+  margin-top: 0;
+}
+
+#panel p {
+  color: var(--muted);
+  line-height: 1.5;
+  margin-top: 0;
+}
+
+textarea {
+  width: 100%;
+  height: 80px;
+  resize: vertical;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+}
+
+button {
+  margin: 8px 8px 0 0;
+  padding: 9px 16px;
+  background: var(--accent);
+  color: #06121f;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:hover {
+  filter: brightness(1.08);
+}
+
+button#btn-join,
+button#btn-reset,
+button#btn-copy-offer,
+button#btn-copy-answer {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+}

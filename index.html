@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shattered World</title>
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <h1>Shattered World</h1>
+        <div id="status">Not connected</div>
+        <div id="score"></div>
+      </header>
+
+      <main>
+        <div id="board"></div>
+
+        <aside id="panel">
+          <!-- menu -->
+          <section data-phase="menu">
+            <p>Turn-based, peer-to-peer. No server. One of you hosts.</p>
+            <button id="btn-host">Host a game</button>
+            <button id="btn-join">Join a game</button>
+          </section>
+
+          <!-- host flow -->
+          <section data-phase="host" hidden>
+            <h2>1 · Send this code to your friend</h2>
+            <textarea id="host-offer" readonly placeholder="Generating…"></textarea>
+            <button id="btn-copy-offer">Copy code</button>
+            <h2>2 · Paste their reply here</h2>
+            <textarea id="host-answer" placeholder="Paste your friend's reply code"></textarea>
+            <button id="btn-host-connect">Connect</button>
+          </section>
+
+          <!-- guest flow -->
+          <section data-phase="guest" hidden>
+            <h2>1 · Paste the host's code</h2>
+            <textarea id="guest-offer" placeholder="Paste the host's code"></textarea>
+            <button id="btn-guest-answer">Generate reply</button>
+            <h2>2 · Send this reply back to the host</h2>
+            <textarea id="guest-answer" readonly></textarea>
+            <button id="btn-copy-answer">Copy reply</button>
+          </section>
+
+          <!-- in-game -->
+          <section data-phase="playing" hidden>
+            <p>Connected! Claim an empty tile next to one you already own. Most tiles when the board locks up wins.</p>
+            <button id="btn-reset">Reset game</button>
+          </section>
+        </aside>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
