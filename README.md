@@ -11,7 +11,7 @@ strategy rules and artwork.
 
 - **TypeScript + Vite** — dev server and static build
 - **PixiJS v8** — board / sprite rendering on a WebGL canvas
-- **WebRTC DataChannel** — direct browser-to-browser messaging
+- **PeerJS** — WebRTC DataChannel with automatic signaling via a free public broker
 - Static hosting (GitHub Pages, Netlify, or just opening the built files)
 
 ## Run it
@@ -26,20 +26,25 @@ Open the printed URL. To play with a friend, both of you open the deployed site
 
 ## How connecting works
 
-There is no signaling server. You exchange two short codes by hand (paste them
-into a chat, email, etc.):
+You share **one** code, host → guest:
 
-1. **Host** clicks *Host a game* → copies the generated code → sends it to the friend.
-2. **Guest** clicks *Join a game* → pastes the host's code → clicks *Generate reply* → sends the reply code back.
-3. **Host** pastes the reply → clicks *Connect*.
+1. **Host** clicks *Host a game* → copies the room code → sends it to the friend.
+2. **Guest** clicks *Join a game* → pastes the code → clicks *Join game*.
 
-Once connected, all game messages flow directly between the two browsers.
+PeerJS's free public **broker** performs the WebRTC offer/answer exchange
+automatically, so you don't paste a reply back. The broker only introduces the
+two browsers — once connected, all game messages flow **directly** between them.
 
-A public **STUN** server (Google's) is used only to discover each peer's public
+Google's public **STUN** server is used only to discover each peer's public
 address so the connection can cross typical home routers. It never sees your
-game data. On restrictive (symmetric) NATs, a direct connection may fail — that
-case needs a **TURN** relay, which would be an actual server. For two friends on
-normal home networks it usually just works.
+game data. On restrictive (symmetric) NATs a direct connection may fail — that
+case needs a **TURN** relay, which would be an actual server.
+
+> **Note on the free broker:** the default `0.peerjs.com` broker is shared and
+> can be slow or briefly unavailable. For something more reliable you can run
+> your own [PeerServer](https://github.com/peers/peerjs-server) (a tiny
+> signaling-only service — no game data passes through it) and point the client
+> at it via the `host`/`port` options in [`src/net.ts`](src/net.ts).
 
 ## The placeholder game
 
@@ -67,4 +72,5 @@ relative `base` so it works from a sub-path (e.g. a GitHub Pages project URL).
 - **Rendering** is in [`src/board.ts`](src/board.ts) — swap the colored
   `Graphics` cells for `Sprite`s to use generated art.
 - **Networking** is in [`src/net.ts`](src/net.ts) — the message protocol is the
-  `NetMessage` union; add new message types there.
+  `NetMessage` union; add new message types there. Swap the broker or STUN/TURN
+  config in the same file.

@@ -3,12 +3,12 @@
 
 import './style.css';
 import { Board } from './board';
-import { Peer, type NetMessage } from './net';
+import { Net, type NetMessage } from './net';
 import { applyMove, createInitialState, score, type GameState, type Player } from './game';
 
 let state: GameState = createInitialState();
 let myPlayer: Player | null = null;
-let peer: Peer | null = null;
+let net: Net | null = null;
 let connected = false;
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -48,7 +48,7 @@ function redraw(): void {
 function handleLocalClick(x: number, y: number): void {
   if (!connected || myPlayer === null) return;
   if (applyMove(state, x, y, myPlayer)) {
-    peer!.send({ type: 'move', x, y });
+    net!.send({ type: 'move', x, y });
     redraw();
   }
 }
@@ -65,8 +65,8 @@ function handleMessage(msg: NetMessage): void {
   }
 }
 
-function makePeer(): Peer {
-  return new Peer({
+function makeNet(): Net {
+  return new Net({
     onOpen: () => {
       connected = true;
       setPhase('playing');
@@ -77,45 +77,41 @@ function makePeer(): Peer {
       redraw();
     },
     onMessage: handleMessage,
+    onError: (message) => {
+      $('status').textContent = message;
+    },
   });
 }
 
 function wireUi(): void {
   $('btn-host').onclick = async () => {
-    peer = makePeer();
+    net = makeNet();
     myPlayer = 0;
     setPhase('host');
-    const offer = await peer.createOffer();
-    $<HTMLTextAreaElement>('host-offer').value = offer;
+    const code = await net.host();
+    $<HTMLInputElement>('host-code').value = code;
   };
 
   $('btn-join').onclick = () => {
-    peer = makePeer();
+    net = makeNet();
     myPlayer = 1;
     setPhase('guest');
   };
 
-  $('btn-guest-answer').onclick = async () => {
-    const offer = $<HTMLTextAreaElement>('guest-offer').value;
-    if (!offer.trim() || !peer) return;
-    const answer = await peer.createAnswer(offer);
-    $<HTMLTextAreaElement>('guest-answer').value = answer;
-  };
-
-  $('btn-host-connect').onclick = async () => {
-    const answer = $<HTMLTextAreaElement>('host-answer').value;
-    if (!answer.trim() || !peer) return;
-    await peer.acceptAnswer(answer);
+  $('btn-join-connect').onclick = () => {
+    const code = $<HTMLInputElement>('guest-code').value;
+    if (!code.trim() || !net) return;
+    $('status').textContent = 'Connecting…';
+    net.join(code);
   };
 
   $('btn-reset').onclick = () => {
     state = createInitialState();
-    peer?.send({ type: 'reset' });
+    net?.send({ type: 'reset' });
     redraw();
   };
 
-  $('btn-copy-offer').onclick = () => copy($<HTMLTextAreaElement>('host-offer').value);
-  $('btn-copy-answer').onclick = () => copy($<HTMLTextAreaElement>('guest-answer').value);
+  $('btn-copy-code').onclick = () => copy($<HTMLInputElement>('host-code').value);
 }
 
 function copy(text: string): void {
