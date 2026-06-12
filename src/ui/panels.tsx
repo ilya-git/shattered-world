@@ -158,15 +158,16 @@ export function CombatPanel({ a, b, result }: { a: { name: string; die: number; 
   );
 }
 
-export function SummonDock({ mana, onPick, activeType, disabledAll, note }: {
+export function SummonDock({ mana, onPick, activeType, disabledAll, dim, note }: {
   mana: number;
   onPick?: (t: UnitType) => void;
   activeType?: UnitType | null;
   disabledAll?: boolean;
+  dim?: boolean;
   note?: string;
 }) {
   return (
-    <div className="wc-panel wc-dock">
+    <div className={'wc-panel wc-dock' + (dim ? ' dim' : '')}>
       <div className="wc-dock-l">
         Summon
         {note && <span className="wc-dock-note">{note}</span>}

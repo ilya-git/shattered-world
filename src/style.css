@@ -397,6 +397,32 @@ html, body { margin: 0; padding: 0; }
 .endturn-btn { position: absolute; z-index: 10; right: 18px; bottom: 18px; background: var(--wc-accent); color: #fff; border: 1.5px solid var(--wc-ink);
   padding: 13px 24px; border-radius: 4px; font-family: 'IM Fell English', serif; font-size: 16px; cursor: pointer; box-shadow: 0 5px 16px rgba(0,0,0,.18); }
 .endturn-btn:disabled { opacity: .4; cursor: not-allowed; }
+/* the only thing left to do — let the button breathe */
+.endturn-btn.glow { animation: etglow 1.9s ease-in-out infinite; }
+@keyframes etglow {
+  0%, 100% { box-shadow: 0 5px 16px rgba(0,0,0,.18); }
+  50% { box-shadow: 0 5px 16px rgba(0,0,0,.18), 0 0 0 3px rgba(181,80,62,.4), 0 0 26px 8px rgba(181,80,62,.55); }
+}
+
+/* units that can still act this turn */
+.ready-counter { position: absolute; z-index: 10; right: 18px; bottom: 78px;
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  background: var(--wc-paper); border: 1.4px solid var(--wc-ink); border-radius: 16px;
+  padding: 5px 13px; font-family: 'IM Fell English', serif; font-size: 12.5px; color: var(--wc-ink);
+  box-shadow: 0 4px 12px rgba(0,0,0,.12); }
+.ready-counter:hover { background: #fff; }
+.ready-counter .rc-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c-fa); border: 1px solid var(--wc-ink); }
+.ready-counter .rc-n { font-size: 15px; }
+.ready-counter .rc-arrow { font-size: 13px; opacity: .6; }
+
+/* "this one is done" stamp on spent tokens */
+.tok-done { position: absolute; right: -9%; top: -9%; width: 40%; height: 40%; z-index: 7;
+  border-radius: 50%; background: var(--wc-paper); border: calc(var(--hex, 64px) * 0.022) solid var(--wc-ink);
+  display: flex; align-items: center; justify-content: center;
+  font-size: calc(var(--hex, 64px) * 0.24); line-height: 1; color: #5a7a44; font-weight: 700; }
+
+.wc-dock.dim { opacity: .55; filter: saturate(.5); }
+.hint-k.urgent { color: var(--wc-accent); opacity: 1; }
 .resign-btn { position: absolute; z-index: 10; left: 18px; bottom: 18px; border: 1.4px solid var(--wc-ink-soft); background: transparent; color: var(--wc-ink);
   padding: 8px 14px; border-radius: 4px; font-family: 'IM Fell English', serif; font-size: 12px; cursor: pointer; opacity: .65; }
 .play-msg { top: auto; bottom: 110px; }

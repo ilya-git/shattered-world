@@ -139,6 +139,7 @@ function Token({ u, geom }: { u: DisplayUnit; geom: BoardGeom }) {
           <Icon type={u.type} />
         </span>
       </div>
+      {u.spent && <span className="tok-done">✓</span>}
       <div className="wc-hp">
         <div className="wc-hp-fill" style={{ width: pct + '%' }}></div>
       </div>

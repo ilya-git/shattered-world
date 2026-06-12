@@ -6,8 +6,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { DIRS, hexDist, keyOf, type Hex } from '../game/hex';
 import { STATS, halfCost, type Faction, type UnitType } from '../game/data';
 import {
-  attackTargets, mapOf, planeswalkCells, reachableCells, shiftTargets, summonCells,
-  translocateDests, unitAt,
+  attackTargets, canSummon, mapOf, planeswalkCells, reachableCells, shiftTargets,
+  summonCells, translocateDests, unitAt, unitCanAct,
   type GameAction, type GameState, type Unit,
 } from '../game/engine';
 import { hexesOf, type MapDef } from '../game/maps';
@@ -302,16 +302,30 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
     return { cells, line, lineCls, arrow, reticle };
   }, [g, map, sel, mode, hover, myTurn, my, summonType, translocId]);
 
-  /* ---------- card ---------- */
+  /* ---------- readiness: what can still act this turn ---------- */
 
-  const spent = (u: Unit) =>
-    u.attacks <= 0 && (u.moveActs <= 0 || u.movePts <= 0 || u.moveLocked) && !u.abilityLock;
+  const readyIds = useMemo(
+    () => (myTurn ? g.units.filter((u) => u.faction === my && unitCanAct(g, u)).map((u) => u.id) : []),
+    [g, my, myTurn],
+  );
+  const readySet = useMemo(() => new Set(readyIds), [readyIds]);
+  const summonOpen = myTurn && canSummon(g);
+  const nothingLeft = myTurn && readyIds.length === 0 && !summonOpen;
+
+  const cycleReady = () => {
+    if (!readyIds.length) return;
+    const i = selId != null ? readyIds.indexOf(selId) : -1;
+    const next = g.units.find((u) => u.id === readyIds[(i + 1) % readyIds.length]);
+    if (next) selectUnit(next);
+  };
+
+  /* ---------- card ---------- */
 
   const units: DisplayUnit[] = g.units.map((u) => ({
     id: u.id, q: u.q, r: u.r, type: u.type, faction: u.faction,
     hp: u.hp, maxHp: STATS[u.type].life,
     sel: sel?.id === u.id,
-    spent: myTurn && u.faction === my && spent(u),
+    spent: myTurn && u.faction === my && !readySet.has(u.id),
   }));
 
   const tip: Tip | null =
@@ -491,17 +505,23 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
           }
         />
       )}
-      {msg && myTurn && (
+      {myTurn && (nothingLeft ? (
+        <div className="wc-panel hint-card play-msg">
+          <span className="hint-k urgent">turn {g.turnNum} · {hotseat ? FACTION_NAME[my] : 'you'}</span>
+          Nothing left to command — <i>end your turn.</i>
+        </div>
+      ) : msg ? (
         <div className="wc-panel hint-card play-msg">
           <span className="hint-k">turn {g.turnNum} · {hotseat ? FACTION_NAME[my] : 'you'}</span>
           {msg}
         </div>
-      )}
+      ) : null)}
 
       <SummonDock
         mana={g.mana[my]}
         activeType={summonType}
         disabledAll={!myTurn || g.actedThisTurn}
+        dim={myTurn && !summonOpen}
         note={g.actedThisTurn ? 'portal closed' : undefined}
         onPick={(t) => {
           setSummonType(t);
@@ -510,7 +530,19 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
           setMsg(`Place the ${STATS[t].name} on a free portal hex.`);
         }}
       />
-      <button className="endturn-btn" disabled={!myTurn} onClick={() => trySend({ kind: 'endTurn' })}>
+      {myTurn && readyIds.length > 0 && (
+        <button className="ready-counter" onClick={cycleReady} title="Jump to the next unit that can still act">
+          <span className="rc-dot"></span>
+          <span className="rc-n">{readyIds.length}</span>
+          <span>still ready</span>
+          <span className="rc-arrow">→</span>
+        </button>
+      )}
+      <button
+        className={'endturn-btn' + (nothingLeft ? ' glow' : '')}
+        disabled={!myTurn}
+        onClick={() => trySend({ kind: 'endTurn' })}
+      >
         End Turn →
       </button>
       <button className="resign-btn" onClick={onResign}>Resign</button>

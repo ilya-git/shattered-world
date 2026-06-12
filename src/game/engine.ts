@@ -318,6 +318,61 @@ export function translocateDests(g: GameState, t: Unit): Hex[] {
   return out;
 }
 
+/* ---------- "anything left to do?" (drives the end-of-turn nudge) ---------- */
+
+/** Could this unit still take a useful action this turn? */
+export function unitCanAct(g: GameState, u: Unit): boolean {
+  if (u.faction !== g.turn) return false;
+  const s = STATS[u.type];
+  const mana = g.mana[u.faction];
+
+  if (
+    u.moveActs > 0 && !u.moveLocked &&
+    (u.movePts > 0 || (u.type === 'swordsman' && mana >= 1)) &&
+    reachableCells(g, u).length > 0
+  ) {
+    return true;
+  }
+  if (u.type === 'planeswalker' && u.moveActs > 0 && !u.moveLocked && mana >= 1 &&
+    planeswalkCells(g, u).length > 0) {
+    return true;
+  }
+  if (s.atk !== null && u.attacks > 0) {
+    if (attackTargets(g, u).length > 0) return true;
+    if (shiftTargets(g, u).length > 0) return true;
+  }
+  if (u.type === 'healer' && mana >= 1) {
+    const locked = u.abilityLock;
+    if (locked || u.attacks > 0) {
+      for (const t of g.units) {
+        if (hexDist(u, t) > s.rng) continue;
+        if (locked && locked.targetId !== t.id) continue;
+        const kind = locked?.kind;
+        // healing a full-health ally does nothing — don't count it as an action
+        if ((kind === 'heal' || !kind) && t.faction === u.faction && t.hp < STATS[t.type].life) return true;
+        if ((kind === 'wound' || !kind) && t.faction !== u.faction) return true;
+      }
+    }
+  }
+  if (u.type === 'translocator' && u.attacks > 0) {
+    const hasDest = translocateDests(g, u).length > 0;
+    for (const t of g.units) {
+      if (t.id === u.id) continue;
+      if (t.faction === u.faction && hexDist(u, t) === 1 && mana >= halfCost(t.type) && hasDest) return true;
+      if (t.faction !== u.faction && hexDist(u, t) <= s.rng && mana >= halfCost(t.type) &&
+        summonCells(g, t.faction).length > 0) return true;
+    }
+  }
+  return false;
+}
+
+const CHEAPEST_UNIT = Math.min(...Object.values(STATS).map((s) => s.cost));
+
+/** Could the current player still summon something this turn? */
+export function canSummon(g: GameState): boolean {
+  return !g.actedThisTurn && g.mana[g.turn] >= CHEAPEST_UNIT && summonCells(g, g.turn).length > 0;
+}
+
 /* ---------- internal mutations (operate on a cloned state) ---------- */
 
 function spendMana(g: GameState, f: Faction, n: number): void {
