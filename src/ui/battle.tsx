@@ -393,7 +393,7 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
       sub: sel.faction === my ? (hotseat ? FACTION_NAME[sel.faction] + ' · selected' : 'your unit · selected') : 'enemy · scouting',
       stats: [
         ['MOV', sel.faction === my && myTurn ? `${sel.movePts}` : `${s.move}`],
-        ['LIFE', `${sel.hp}`],
+        ['LIFE', `${sel.hp}/${s.life}`],
         ['ATK', s.atk === null ? '—' : `${s.atk}`],
         ['DEF', aura ? `${s.def}+${aura}` : `${s.def}`],
         ['RNG', `${s.rng}`],
