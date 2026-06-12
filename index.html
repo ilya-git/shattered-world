@@ -4,49 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Shattered World</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Caveat:wght@400;500;600;700&family=Spectral:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
   </head>
   <body>
-    <div id="app">
-      <header>
-        <h1>Shattered World</h1>
-        <div id="status">Not connected</div>
-        <div id="score"></div>
-      </header>
-
-      <main>
-        <div id="board"></div>
-
-        <aside id="panel">
-          <!-- menu -->
-          <section data-phase="menu">
-            <p>Turn-based, peer-to-peer. No server. One of you hosts.</p>
-            <button id="btn-host">Host a game</button>
-            <button id="btn-join">Join a game</button>
-          </section>
-
-          <!-- host flow -->
-          <section data-phase="host" hidden>
-            <h2>Send this code to your friend</h2>
-            <input id="host-code" class="code" readonly placeholder="Creating room…" />
-            <button id="btn-copy-code">Copy code</button>
-            <p id="host-wait">Waiting for your friend to join…</p>
-          </section>
-
-          <!-- guest flow -->
-          <section data-phase="guest" hidden>
-            <h2>Enter the host's code</h2>
-            <input id="guest-code" class="code" placeholder="e.g. sw-k7q2m" />
-            <button id="btn-join-connect">Join game</button>
-          </section>
-
-          <!-- in-game -->
-          <section data-phase="playing" hidden>
-            <p>Connected! Claim an empty tile next to one you already own. Most tiles when the board locks up wins.</p>
-            <button id="btn-reset">Reset game</button>
-          </section>
-        </aside>
-      </main>
-    </div>
-    <script type="module" src="/src/main.ts"></script>
+    <div id="stage"><div id="frame"><div id="root"></div></div></div>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

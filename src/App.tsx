@@ -1,0 +1,235 @@
+// Top-level flow: Title → Host/Join → War Room → Battle → Outcome, with the
+// PeerJS lockstep underneath. Both peers run the identical engine on the same
+// seed, so only GameActions ever travel over the wire.
+
+import { useEffect, useRef, useState } from 'react';
+import { Net, type NetMessage } from './net';
+import {
+  applyAction, createGame, RuleError,
+  type GameAction, type GameMode, type GameState,
+} from './game/engine';
+import type { Faction } from './game/data';
+import { BattleScreen } from './ui/battle';
+import { HostScreen, JoinScreen, OutcomeScreen, RulesScreen, TitleScreen, WarRoom } from './ui/screens';
+
+type Route =
+  | { s: 'title' }
+  | { s: 'rules' }
+  | { s: 'host' }
+  | { s: 'join' }
+  | { s: 'warroom' }
+  | { s: 'battle' };
+
+const startManaFor = (mode: GameMode): number => (mode === 'battle' ? 200 : 30);
+
+export default function App() {
+  const [route, setRoute] = useState<Route>({ s: 'title' });
+  const [hotseat, setHotseat] = useState(false);
+  const [isHost, setIsHost] = useState(true);
+  const [code, setCode] = useState<string | null>(null);
+  const [netError, setNetError] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState(false);
+  const [mode, setMode] = useState<GameMode>('control');
+  const [game, setGame] = useState<GameState | null>(null);
+  const [rematchAsked, setRematchAsked] = useState(false);
+
+  const netRef = useRef<Net | null>(null);
+  const gameRef = useRef<GameState | null>(null);
+  gameRef.current = game;
+  const isHostRef = useRef(isHost);
+  isHostRef.current = isHost;
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+
+  const startLocal = (seed: number, m: GameMode) => {
+    setGame(createGame(seed, m, startManaFor(m), 'a'));
+    setRematchAsked(false);
+    setRoute({ s: 'battle' });
+  };
+
+  const handleMessage = (msg: NetMessage) => {
+    if (msg.type === 'start') {
+      setMode(msg.mode);
+      setGame(createGame(msg.seed, msg.mode, msg.startMana, 'a'));
+      setRematchAsked(false);
+      setRoute({ s: 'battle' });
+    } else if (msg.type === 'action') {
+      const g = gameRef.current;
+      if (!g) return;
+      try {
+        setGame(applyAction(g, msg.action));
+      } catch (e) {
+        // states diverged or a stray message — surface it rather than desync
+        console.error('remote action rejected', msg.action, e);
+      }
+    } else if (msg.type === 'rematch') {
+      if (isHostRef.current) {
+        // guest asked for a rematch — host deals the next battle
+        const m = modeRef.current;
+        const seed = (Math.random() * 0x7fffffff) | 0;
+        netRef.current?.send({ type: 'start', seed, mode: m, startMana: startManaFor(m) });
+        startLocal(seed, m);
+      } else {
+        setRematchAsked(true);
+      }
+    }
+  };
+
+  const makeNet = () => {
+    const net = new Net({
+      onOpen: () => {
+        setConnecting(false);
+        setNetError(null);
+        setRoute({ s: 'warroom' });
+      },
+      onClose: () => {
+        setNetError('Connection lost.');
+        setRoute((r) => (r.s === 'battle' || r.s === 'warroom' ? { s: 'title' } : r));
+      },
+      onMessage: handleMessage,
+      onError: (message) => {
+        setNetError(message);
+        setConnecting(false);
+      },
+    });
+    netRef.current = net;
+    return net;
+  };
+
+  useEffect(() => () => netRef.current?.close?.(), []);
+
+  /* ---------- local dispatch: validate, apply, relay ---------- */
+
+  const dispatch = (a: GameAction): boolean => {
+    const g = gameRef.current;
+    if (!g) return false;
+    try {
+      const next = applyAction(g, a);
+      setGame(next);
+      if (!hotseat) netRef.current?.send({ type: 'action', action: a });
+      return true;
+    } catch (e) {
+      if (e instanceof RuleError) return false;
+      throw e;
+    }
+  };
+
+  const toTitle = () => {
+    netRef.current = null;
+    setGame(null);
+    setCode(null);
+    setNetError(null);
+    setConnecting(false);
+    setRoute({ s: 'title' });
+  };
+
+  /* ---------- routes ---------- */
+
+  if (route.s === 'rules') return <RulesScreen onBack={toTitle} />;
+
+  if (route.s === 'host') {
+    return <HostScreen code={code} error={netError} onBack={toTitle} />;
+  }
+
+  if (route.s === 'join') {
+    return (
+      <JoinScreen
+        connecting={connecting}
+        error={netError}
+        onBack={toTitle}
+        onConnect={(c) => {
+          setConnecting(true);
+          setNetError(null);
+          netRef.current?.join(c.trim().toLowerCase());
+        }}
+      />
+    );
+  }
+
+  if (route.s === 'warroom') {
+    return (
+      <WarRoom
+        isHost={isHost}
+        code={code ?? ''}
+        mode={mode}
+        onMode={setMode}
+        onBack={toTitle}
+        onStart={() => {
+          const seed = (Math.random() * 0x7fffffff) | 0;
+          netRef.current?.send({ type: 'start', seed, mode, startMana: startManaFor(mode) });
+          startLocal(seed, mode);
+        }}
+      />
+    );
+  }
+
+  if (route.s === 'battle' && game) {
+    const me: Faction = hotseat ? game.turn : isHost ? 'a' : 'b';
+    if (game.winner || game.draw) {
+      return (
+        <OutcomeScreen
+          g={game}
+          me={hotseat ? (game.winner ?? 'a') : me}
+          names={{ a: 'Azure Vanguard', b: 'Crimson Horde' }}
+          rematchWaiting={rematchAsked && !isHost}
+          onMenu={toTitle}
+          onRematch={() => {
+            if (hotseat) {
+              startLocal((Math.random() * 0x7fffffff) | 0, mode);
+            } else if (isHost) {
+              const seed = (Math.random() * 0x7fffffff) | 0;
+              netRef.current?.send({ type: 'start', seed, mode, startMana: startManaFor(mode) });
+              startLocal(seed, mode);
+            } else {
+              netRef.current?.send({ type: 'rematch' });
+              setRematchAsked(true);
+            }
+          }}
+        />
+      );
+    }
+    return (
+      <BattleScreen
+        g={game}
+        me={me}
+        hotseat={hotseat}
+        dispatch={dispatch}
+        onResign={() => dispatch({ kind: 'resign', faction: me })}
+      />
+    );
+  }
+
+  return (
+    <TitleScreen
+      onRules={() => setRoute({ s: 'rules' })}
+      onHotseat={() => {
+        setHotseat(true);
+        setIsHost(true);
+        setMode('control');
+        setRoute({ s: 'warroom' });
+        netRef.current = null;
+        setCode('hotseat · one table');
+      }}
+      onHost={async () => {
+        setHotseat(false);
+        setIsHost(true);
+        setNetError(null);
+        setRoute({ s: 'host' });
+        const net = makeNet();
+        try {
+          const c = await net.host();
+          setCode(c);
+        } catch {
+          /* error already surfaced via onError */
+        }
+      }}
+      onJoin={() => {
+        setHotseat(false);
+        setIsHost(false);
+        setNetError(null);
+        makeNet();
+        setRoute({ s: 'join' });
+      }}
+    />
+  );
+}

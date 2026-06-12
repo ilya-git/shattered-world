@@ -1,18 +1,39 @@
 # Shattered World
 
-A serverless, peer-to-peer, turn-based strategy game that runs entirely in the
-browser. Two players connect directly over WebRTC — no backend, no accounts.
+A serverless, peer-to-peer, turn-based hex strategy game that runs entirely in
+the browser. Two sorcerers battle for the mana sources of a fractured astral
+isle — dice combat, summoned armies, and three ways to win. Two players connect
+directly over WebRTC; no backend, no accounts.
 
-This is a **starter scaffold**: the multiplayer plumbing and a placeholder
-"claim the tiles" game are fully working, ready for you to swap in your real
-strategy rules and artwork.
+The rules implement **Rules.docx v1.0**; the visuals implement the parchment
+ink-&-watercolor direction from the Claude Design handoff
+(*Shattered World Screens.html*).
+
+## The game
+
+- **Control** (default) — shift the nine mana **Sources** to your side and hold
+  all of them for **3 continuous turns**.
+- **The Gathering** — be the first to double the starting mana (the second
+  player gets one catch-up turn if the first-mover hits the goal first).
+- **Battle** — no sources, ✦200 to spend, annihilate the enemy.
+- **Hotseat** — both factions on one screen, no network needed.
+
+Each turn: gain ✦1 per controlled source → summon at your portal (until your
+first move/attack) → move & attack in any order. Combat is 1d6 + ATK vs
+1d6 + DEF; ties favor the defender, damage is the difference.
+
+The full nine-unit roster is in: Archer (+1 range/✦1), Swordsman (+1 move/✦1),
+Planeswalker (✦1/hex over anything), Catapult (min range 5, splash),
+Defender (+2 DEF aura), Barbarian (attacks twice), Mounted Archer (shot on the
+run), Healer (mend/wound 1 life/✦1) and Translocator (translocate / banish).
+Terrain has three elevation grades — movement and melee only work across one
+grade, so mountains need ramps and water needs bridges.
 
 ## Stack
 
-- **TypeScript + Vite** — dev server and static build
-- **PixiJS v8** — board / sprite rendering on a WebGL canvas
+- **TypeScript + Vite + React** — UI and static build
 - **PeerJS** — WebRTC DataChannel with automatic signaling via a free public broker
-- Static hosting (GitHub Pages, Netlify, or just opening the built files)
+- Static hosting (GitHub Pages via the included workflow)
 
 ## Run it
 
@@ -22,36 +43,32 @@ npm run dev
 ```
 
 Open the printed URL. To play with a friend, both of you open the deployed site
-(or use two browser windows to test locally).
+(or use two browser windows to test locally). One **Hosts** and shares the room
+code; the other **Joins** with it. The host picks the mode in the war room and
+starts the battle.
 
-## How connecting works
+## How multiplayer works
 
-You share **one** code, host → guest:
+Both peers run the **identical, deterministic rules engine**
+([`src/game/engine.ts`](src/game/engine.ts)) from the same RNG seed, so only
+the actions a player takes ever travel over the wire (`NetMessage` in
+[`src/net.ts`](src/net.ts)). Dice are rolled from the shared seed — neither
+client can cheat without desyncing.
 
-1. **Host** clicks *Host a game* → copies the room code → sends it to the friend.
-2. **Guest** clicks *Join a game* → pastes the code → clicks *Join game*.
+PeerJS's free public **broker** performs the WebRTC offer/answer exchange; once
+connected, all game traffic flows directly between the browsers. STUN
+(Google's public server) handles typical home NATs; a free-tier Metered **TURN**
+relay covers restrictive networks.
 
-PeerJS's free public **broker** performs the WebRTC offer/answer exchange
-automatically, so you don't paste a reply back. The broker only introduces the
-two browsers — once connected, all game messages flow **directly** between them.
+## Project layout
 
-Google's public **STUN** server is used only to discover each peer's public
-address so the connection can cross typical home routers. It never sees your
-game data. On restrictive (symmetric) NATs a direct connection may fail — that
-case needs a **TURN** relay, which would be an actual server.
-
-> **Note on the free broker:** the default `0.peerjs.com` broker is shared and
-> can be slow or briefly unavailable. For something more reliable you can run
-> your own [PeerServer](https://github.com/peers/peerjs-server) (a tiny
-> signaling-only service — no game data passes through it) and point the client
-> at it via the `host`/`port` options in [`src/net.ts`](src/net.ts).
-
-## The placeholder game
-
-9×9 grid. You start with one tile (host top-left, guest bottom-right). On your
-turn, click an empty tile orthogonally adjacent to one you own to claim it.
-Legal moves are outlined in green. When neither player can move, the most tiles
-wins.
+- [`src/game/`](src/game/) — pure rules: hex math, unit data, the map, and the
+  action reducer. No rendering or networking; keep changes deterministic.
+- [`src/ui/`](src/ui/) — the parchment UI: board, panels, screens, battle.
+- [`src/App.tsx`](src/App.tsx) — flow (title → lobby → battle → outcome) and
+  the lockstep dispatch.
+- [`scripts/engine-smoke.ts`](scripts/engine-smoke.ts) — scripted rules check:
+  `npx tsx scripts/engine-smoke.ts`
 
 ## Build & deploy
 
@@ -60,17 +77,4 @@ npm run build      # outputs to dist/
 npm run preview    # serve the build locally
 ```
 
-`dist/` is a static site — drop it on any static host. `vite.config.ts` uses a
-relative `base` so it works from a sub-path (e.g. a GitHub Pages project URL).
-
-## Where to take it next
-
-- **Game rules** live in [`src/game.ts`](src/game.ts) — pure, deterministic
-  functions. Both peers run identical logic and only exchange the move that was
-  made, so keep new rules deterministic and route every state change through a
-  `NetMessage`.
-- **Rendering** is in [`src/board.ts`](src/board.ts) — swap the colored
-  `Graphics` cells for `Sprite`s to use generated art.
-- **Networking** is in [`src/net.ts`](src/net.ts) — the message protocol is the
-  `NetMessage` union; add new message types there. Swap the broker or STUN/TURN
-  config in the same file.
+Pushes to `main` deploy to GitHub Pages via the included workflow.

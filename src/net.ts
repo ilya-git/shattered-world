@@ -11,10 +11,12 @@
 // relay — see the README.)
 
 import Peer, { type DataConnection } from 'peerjs';
+import type { GameAction, GameMode } from './game/engine';
 
 export type NetMessage =
-  | { type: 'move'; x: number; y: number }
-  | { type: 'reset' };
+  | { type: 'start'; seed: number; mode: GameMode; startMana: number }
+  | { type: 'action'; action: GameAction }
+  | { type: 'rematch' };
 
 interface Handlers {
   onOpen: () => void;
@@ -87,6 +89,12 @@ export class Net {
     if (this.conn?.open) {
       void this.conn.send(msg);
     }
+  }
+
+  /** Tear down the connection and broker registration. */
+  close(): void {
+    this.conn?.close();
+    this.peer?.destroy();
   }
 
   private setupConn(conn: DataConnection): void {

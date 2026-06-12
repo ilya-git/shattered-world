@@ -1,0 +1,193 @@
+// HUD chrome from sw-core.jsx: parchment screen shell, top bar, unit card,
+// combat dice readout, and the summon dock — extended to the full nine-unit
+// roster from Rules.docx.
+
+import type { CSSProperties, ReactNode } from 'react';
+import { STATS, UNIT_ORDER, type Faction, type UnitType } from '../game/data';
+import { Icon } from './icons';
+
+export const PARCH: CSSProperties = {
+  '--wc-paper': '#f1ebdd',
+  '--wc-paper2': '#e7dcc4',
+  '--wc-ink': '#3b3326',
+  '--wc-ink-soft': 'rgba(59,51,38,.5)',
+  '--c-grass': '#9cb56a',
+  '--c-water': '#7fb0c2',
+  '--c-mountain': '#b3a48f',
+  '--c-sand': '#e3cf95',
+  '--c-source': '#bb9bd6',
+  '--c-portal': '#d8c8a6',
+  '--c-fa': '#436c98',
+  '--c-fb': '#b5503e',
+  '--wc-accent': '#b5503e',
+  '--wc-gem': '#9a76c0',
+} as CSSProperties;
+
+export function Screen({ children, className, label }: { children: ReactNode; className?: string; label?: string }) {
+  return (
+    <div className={'wc ' + (className || '')} style={PARCH} data-screen-label={label}>
+      <div className="wc-paper"></div>
+      <div className="wc-grain"></div>
+      {children}
+    </div>
+  );
+}
+
+export function Die({ value }: { value: number }) {
+  const place: Record<number, number[]> = {
+    1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8],
+  };
+  const g = Array(9).fill(0);
+  (place[value] || [4]).forEach((i) => (g[i] = 1));
+  return (
+    <div className="wc-die">
+      {g.map((on, i) => (
+        <span key={i} className={on ? 'wc-pip on' : 'wc-pip'}></span>
+      ))}
+    </div>
+  );
+}
+
+export function TopBar({ turn, mana }: { turn: { faction: Faction; label: string; sub: string }; mana: { n: number; sub: string } }) {
+  return (
+    <div className="wc-panel wc-top">
+      <div className="wc-turn">
+        <span className={'wc-dot f' + turn.faction}></span>
+        <span className="wc-turn-t">
+          <b>{turn.label}</b>
+          <i>{turn.sub}</i>
+        </span>
+      </div>
+      <div className="wc-wordmark">Shattered World</div>
+      <div className="wc-mana">
+        <span className="wc-gem">✦</span>
+        <span className="wc-mana-n">{mana.n}</span>
+        <span className="wc-mana-s">{mana.sub}</span>
+      </div>
+    </div>
+  );
+}
+
+export interface CardAction {
+  label: string;
+  active?: boolean;
+  disabled?: boolean;
+  onClick?: () => void;
+}
+
+export interface CardUnit {
+  type: UnitType;
+  faction: Faction;
+  name: string;
+  sub: string;
+  stats: Array<[string, ReactNode]>;
+  special: ReactNode;
+  spLabel?: string;
+}
+
+export function UnitCard({ unit, actions }: { unit: CardUnit; actions?: CardAction[] | null }) {
+  return (
+    <div className="wc-panel wc-card">
+      <div className="wc-card-head">
+        <div
+          className="wc-portrait"
+          style={{ '--tok-c': unit.faction === 'b' ? 'var(--c-fb)' : 'var(--c-fa)' } as CSSProperties}
+        >
+          <span className="wc-portrait-ic">
+            <Icon type={unit.type} />
+          </span>
+        </div>
+        <div>
+          <div className="wc-card-name">{unit.name}</div>
+          <div className="wc-card-sub">
+            <span className={'wc-dot f' + unit.faction}></span> {unit.sub}
+          </div>
+        </div>
+      </div>
+      <div className="wc-stats">
+        {unit.stats.map(([k, v]) => (
+          <div key={k} className="wc-stat">
+            <span className="wc-stat-v">{v}</span>
+            <span className="wc-stat-k">{k}</span>
+          </div>
+        ))}
+      </div>
+      <div className="wc-special">
+        <span className="wc-sp-l">{unit.spLabel || 'special'}</span>
+        {unit.special}
+      </div>
+      {actions && (
+        <div className="wc-acts">
+          {actions.map((a) => (
+            <button
+              key={a.label}
+              disabled={a.disabled}
+              onClick={a.onClick}
+              className={'wc-act' + (a.active ? ' primary' : '')}
+            >
+              {a.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function CombatPanel({ a, b, result }: { a: { name: string; die: number; add: number }; b: { name: string; die: number; add: number }; result: ReactNode }) {
+  return (
+    <div className="wc-panel wc-combat">
+      <div className="wc-combat-h">the dice are cast</div>
+      <div className="wc-combat-row">
+        <div className="wc-cb a">
+          <span className="wc-cb-n">{a.name}</span>
+          <Die value={a.die} />
+          <span className="wc-cb-add">+{a.add}</span>
+          <span className="wc-cb-tot">{a.die + a.add}</span>
+        </div>
+        <div className="wc-cb-vs">vs</div>
+        <div className="wc-cb b">
+          <span className="wc-cb-n">{b.name}</span>
+          <Die value={b.die} />
+          <span className="wc-cb-add">+{b.add}</span>
+          <span className="wc-cb-tot">{b.die + b.add}</span>
+        </div>
+      </div>
+      <div className="wc-combat-r">{result}</div>
+    </div>
+  );
+}
+
+export function SummonDock({ mana, onPick, activeType, disabledAll, note }: {
+  mana: number;
+  onPick?: (t: UnitType) => void;
+  activeType?: UnitType | null;
+  disabledAll?: boolean;
+  note?: string;
+}) {
+  return (
+    <div className="wc-panel wc-dock">
+      <div className="wc-dock-l">
+        Summon
+        {note && <span className="wc-dock-note">{note}</span>}
+      </div>
+      <div className="wc-dock-items">
+        {UNIT_ORDER.map((t) => (
+          <button
+            key={t}
+            className={'wc-summon' + (activeType === t ? ' picked' : '')}
+            disabled={STATS[t].cost > mana || disabledAll}
+            onClick={onPick ? () => onPick(t) : undefined}
+            title={STATS[t].special}
+          >
+            <span className="wc-su-ic" style={{ '--tok-c': 'var(--c-fa)' } as CSSProperties}>
+              <Icon type={t} />
+            </span>
+            <span className="wc-su-n">{STATS[t].name}</span>
+            <span className="wc-su-c">✦{STATS[t].cost}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
