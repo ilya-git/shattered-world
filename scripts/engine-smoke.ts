@@ -187,5 +187,35 @@ check(STATS.catapult.minRng === 5, 'catapult min range 5');
   check(r2.length > 0, 'amphis: movement works on the big map');
 }
 
+
+// ---- Amphis fidelity: every source shiftable, portals interconnected ----
+{
+  const am = MAPS.amphis;
+  const GRADE: Record<string, number> = { grass:1, water:1, sand:1, forest:1, source:2, portal:2, bridge:2, ramp:2, mountain:3, desert:3 };
+  const PASSABLE_T = new Set(['grass','sand','forest','portal','bridge','ramp','mountain','desert']);
+  const key = (q: number, r: number) => q + ',' + r;
+  const start = am.portals.a[0];
+  const seen = new Set([key(start.q, start.r)]);
+  const queue = [start];
+  const DIRS6 = [[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]];
+  while (queue.length) {
+    const cur = queue.pop()!;
+    const ct = am.terrain.get(key(cur.q, cur.r))!;
+    for (const [dq, dr] of DIRS6) {
+      const nq = cur.q + dq, nr = cur.r + dr, k = key(nq, nr);
+      if (seen.has(k)) continue;
+      const t = am.terrain.get(k);
+      if (!t || !PASSABLE_T.has(t)) continue;
+      if (Math.abs(GRADE[ct] - GRADE[t]) > 1) continue;
+      seen.add(k); queue.push({ q: nq, r: nr });
+    }
+  }
+  check(am.portals.b.some((p2) => seen.has(key(p2.q, p2.r))), 'amphis: portals interconnected');
+  const allShiftable = am.sources.every((src) =>
+    DIRS6.some(([dq, dr]) => seen.has(key(src.q + dq, src.r + dr))),
+  );
+  check(allShiftable, 'amphis: every source has a reachable shifting spot');
+}
+
 console.log(failures ? `\n${failures} FAILURES` : '\nall good');
 process.exit(failures ? 1 : 0);
