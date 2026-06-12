@@ -331,7 +331,7 @@ html, body { margin: 0; padding: 0; }
 .tb-crest.fb { background: var(--c-fb); } .tb-crest.fa { background: var(--c-fa); }
 .tb-line { font-family: 'IM Fell English', serif; font-style: italic; font-size: 54px; color: var(--wc-paper); text-shadow: 0 3px 18px rgba(0,0,0,.55); }
 .tb-sub { font-size: 16px; color: rgba(255,255,255,.86); font-style: italic; }
-.banner-fade { animation: bannerOut .5s ease 1.2s forwards; }
+.banner-fade { animation: bannerOut .6s ease 2.6s forwards; }
 @keyframes bannerOut { to { opacity: 0; visibility: hidden; } }
 
 /* ===== outcomes ===== */
@@ -412,3 +412,17 @@ html, body { margin: 0; padding: 0; }
 .resign-btn { position: absolute; z-index: 10; left: 18px; bottom: 18px; border: 1.4px solid var(--wc-ink-soft); background: transparent; color: var(--wc-ink);
   padding: 8px 14px; border-radius: 4px; font-family: 'IM Fell English', serif; font-size: 12px; cursor: pointer; opacity: .65; }
 .play-msg { top: auto; bottom: 110px; }
+
+/* ===== battle log ===== */
+.log-btn { position: absolute; z-index: 10; left: 88px; bottom: 18px; border: 1.4px solid var(--wc-ink-soft); background: transparent; color: var(--wc-ink);
+  padding: 8px 14px; border-radius: 4px; font-family: 'IM Fell English', serif; font-size: 12px; cursor: pointer; opacity: .65; }
+.log-btn.on { border-color: var(--wc-ink); background: var(--wc-paper); opacity: 1; }
+.log-panel { left: 18px; top: 90px; bottom: 150px; width: 300px; z-index: 12; display: flex; flex-direction: column; padding: 10px 0 6px; }
+.log-head { display: flex; align-items: center; justify-content: space-between; padding: 0 14px 6px; border-bottom: 1px solid var(--wc-ink-soft); }
+.log-head .hint-k { margin: 0; font-size: 17px; }
+.log-close { border: none; background: transparent; color: var(--wc-ink); font-size: 18px; cursor: pointer; opacity: .7; line-height: 1; }
+.log-list { flex: 1; overflow-y: auto; padding: 6px 14px; display: flex; flex-direction: column; gap: 6px; }
+.log-empty { font-style: italic; font-size: 12.5px; opacity: .6; }
+.log-entry { display: flex; gap: 8px; align-items: baseline; font-size: 12.5px; line-height: 1.35; }
+.log-entry .wc-dot { width: 8px; height: 8px; flex: 0 0 auto; transform: translateY(.5px); }
+.log-entry.turn { opacity: .65; font-style: italic; border-bottom: 1px dotted var(--wc-ink-soft); padding-bottom: 5px; }

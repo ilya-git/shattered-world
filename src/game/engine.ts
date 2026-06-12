@@ -57,6 +57,18 @@ export interface Combat {
   killed: string[];
 }
 
+export interface LogEntry {
+  /** full round number when it happened */
+  t: number;
+  f: Faction;
+  kind: 'summon' | 'move' | 'attack' | 'shift' | 'heal' | 'wound'
+    | 'translocate' | 'banish' | 'turn' | 'resign';
+  text: string;
+  /** merge key for repeated 1-mana applications (heal/wound) */
+  key?: string;
+  n?: number;
+}
+
 export interface GameState {
   mode: GameMode;
   mapId: MapId;
@@ -83,6 +95,8 @@ export interface GameState {
   rng: number;
   lastCombat: Combat | null;
   lastEvent: string | null;
+  /** chronological battle log, identical on both peers */
+  log: LogEntry[];
   winner: Faction | null;
   draw: boolean;
   stats: Record<Faction, FactionStats>;
@@ -178,10 +192,16 @@ export function createGame(seed: number, mode: GameMode, startMana: number, firs
     rng: seed | 0,
     lastCombat: null,
     lastEvent: null,
+    log: [],
     winner: null,
     draw: false,
     stats: { a: freshStats(), b: freshStats() },
   };
+}
+
+function pushLog(g: GameState, kind: LogEntry['kind'], text: string, key?: string): void {
+  g.log.push({ t: g.turnNum, f: g.turn, kind, text, key, n: 1 });
+  if (g.log.length > 400) g.log.shift();
 }
 
 /** In Battle mode the source hexes revert to plain grass. */
@@ -428,6 +448,7 @@ export function applyAction(prev: GameState, action: GameAction): GameState {
     need(!g.winner, 'game over');
     g.winner = other(action.faction);
     g.lastEvent = 'resigned';
+    g.log.push({ t: g.turnNum, f: action.faction, kind: 'resign', text: 'lays down arms', n: 1 });
     return g;
   }
 
@@ -451,6 +472,7 @@ export function applyAction(prev: GameState, action: GameAction): GameState {
     g.units.push(mkUnit(g, action.ut, f, action.q, action.r));
     g.everSummoned[f] = true;
     g.lastEvent = `${STATS[action.ut].name} summoned`;
+    pushLog(g, 'summon', `summons a ${STATS[action.ut].name} (✦${cost})`);
     return g;
   }
 
@@ -470,6 +492,7 @@ export function applyAction(prev: GameState, action: GameAction): GameState {
       if (u.moveActs <= 0) u.movePts = 0;
       u.moved = true;
       g.actedThisTurn = true;
+      pushLog(g, 'move', `${STATS[u.type].name} marches ${cell.n} hex${cell.n > 1 ? 'es' : ''}${cell.manaCost > 0 ? ` (forced march ✦${cell.manaCost})` : ''}`);
       break;
     }
 
@@ -484,6 +507,7 @@ export function applyAction(prev: GameState, action: GameAction): GameState {
       u.moved = true;
       g.actedThisTurn = true;
       g.lastEvent = 'planeswalked';
+      pushLog(g, 'move', `Planeswalker steps between worlds — ${cell.n} hexes (✦${cell.manaCost})`);
       break;
     }
 
@@ -527,6 +551,13 @@ export function applyAction(prev: GameState, action: GameAction): GameState {
         splash: splashed,
         killed,
       };
+      pushLog(
+        g, 'attack',
+        `${s.name} ${atkTotal} (${atkDie}+${s.atk}) vs ${STATS[target.type].name} ${defTotal} (${defDie}+${defAdd}) — ` +
+          (dmg > 0 ? `${dmg} damage` : 'deflected') +
+          (splashed.length ? ` · splash on ${splashed.join(', ')}` : '') +
+          (killed.length ? ` · ${killed.join(', ')} falls` : ''),
+      );
       afterOffense(g, u);
       checkBattleWipe(g);
       break;
@@ -540,6 +571,7 @@ export function applyAction(prev: GameState, action: GameAction): GameState {
       g.stats[f].shifts += 1;
       afterOffense(g, u);
       g.lastEvent = 'source shifted';
+      pushLog(g, 'shift', `${STATS[u.type].name} shifts a mana Source`);
       break;
     }
 
@@ -565,12 +597,27 @@ export function applyAction(prev: GameState, action: GameAction): GameState {
         u.abilityLock = { kind: action.kind, targetId: target.id };
       }
       spendMana(g, f, 1);
+      const tName = STATS[target.type].name;
+      const mergeKey = `${action.kind}:${u.id}:${target.id}`;
+      const last = g.log[g.log.length - 1];
+      const verb = action.kind === 'heal' ? 'mends' : 'wounds';
+      const sign = action.kind === 'heal' ? '+' : '−';
+      if (last && last.key === mergeKey) {
+        last.n = (last.n ?? 1) + 1;
+        last.text = `Healer ${verb} ${tName} (${sign}${last.n})`;
+      } else {
+        pushLog(g, action.kind, `Healer ${verb} ${tName} (${sign}1)`, mergeKey);
+      }
+      g.lastEvent = `Healer ${verb} ${tName}`;
       if (action.kind === 'heal') {
         target.hp = Math.min(STATS[target.type].life, target.hp + 1);
       } else {
         target.hp -= 1;
         const killed = removeDead(g, f);
-        if (killed.length) g.lastEvent = `${killed.join(', ')} succumbs`;
+        if (killed.length) {
+          g.lastEvent = `${killed.join(', ')} succumbs`;
+          pushLog(g, 'wound', `${killed.join(', ')} succumbs to its wounds`);
+        }
         checkBattleWipe(g);
       }
       break;
@@ -593,6 +640,7 @@ export function applyAction(prev: GameState, action: GameAction): GameState {
       target.r = action.r;
       afterOffense(g, u);
       g.lastEvent = `${STATS[target.type].name} translocated`;
+      pushLog(g, 'translocate', `Translocator sends ${STATS[target.type].name} through the weave (✦${cost})`);
       break;
     }
 
@@ -611,6 +659,7 @@ export function applyAction(prev: GameState, action: GameAction): GameState {
       target.r = slot.r;
       afterOffense(g, u);
       g.lastEvent = `${STATS[target.type].name} banished`;
+      pushLog(g, 'banish', `Translocator banishes the enemy ${STATS[target.type].name} to its portal (✦${cost})`);
       break;
     }
   }
@@ -626,6 +675,7 @@ function allSourcesOwned(g: GameState, f: Faction): boolean {
 
 function endTurn(g: GameState): void {
   const ending = g.turn;
+  pushLog(g, 'turn', 'ends the turn');
 
   // Control: "one [turn] counts if at the beginning of your turn all the
   // sources were under your control, and they still remain so at the end of

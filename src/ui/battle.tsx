@@ -64,6 +64,8 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
   const [hover, setHover] = useState<Hex | null>(null);
   const [msg, setMsg] = useState<string>('Click one of your units to begin — or summon from the dock.');
   const [combat, setCombat] = useState<GameState['lastCombat']>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [showLog, setShowLog] = useState(false);
 
   const sel = selId != null ? g.units.find((u) => u.id === selId) ?? null : null;
 
@@ -71,11 +73,22 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
   useEffect(() => {
     if (g.lastCombat) {
       setCombat(g.lastCombat);
-      const t = setTimeout(() => setCombat(null), 3000);
+      const t = setTimeout(() => setCombat(null), 6500);
       return () => clearTimeout(t);
     }
     return undefined;
   }, [g.lastCombat, g.units]);
+
+  // narrate the opponent's actions (heals, shifts, summons … — attacks
+  // already show the dice panel, turn changes show the banner)
+  const lastEntry = g.log[g.log.length - 1];
+  useEffect(() => {
+    if (!lastEntry || hotseat) return undefined;
+    if (lastEntry.f === me || lastEntry.kind === 'attack' || lastEntry.kind === 'turn') return undefined;
+    setToast(`${FACTION_NAME[lastEntry.f]} · ${lastEntry.text}`);
+    const t = setTimeout(() => setToast(null), 6000);
+    return () => clearTimeout(t);
+  }, [lastEntry, me, hotseat]);
 
   // reset interaction state when the turn changes hands
   const turnKey = g.turn + ':' + g.turnNum;
@@ -543,6 +556,34 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
           {msg}
         </div>
       ) : null)}
+      {!myTurn && toast && (
+        <div className="wc-panel hint-card play-msg">
+          <span className="hint-k">turn {g.turnNum} · rival</span>
+          {toast}
+        </div>
+      )}
+
+      {showLog && (
+        <div className="wc-panel log-panel">
+          <div className="log-head">
+            <span className="hint-k">battle log</span>
+            <button className="log-close" onClick={() => setShowLog(false)}>×</button>
+          </div>
+          <div className="log-list">
+            {g.log.length === 0 && <div className="log-empty">nothing has happened yet</div>}
+            {[...g.log].reverse().map((e, i) => (
+              <div key={g.log.length - i} className={'log-entry' + (e.kind === 'turn' ? ' turn' : '')}>
+                <span className={'wc-dot f' + e.f}></span>
+                <span className="log-text">
+                  {e.kind === 'turn' || e.kind === 'resign'
+                    ? `${FACTION_NAME[e.f]} ${e.text} (turn ${e.t})`
+                    : e.text}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <SummonDock
         mana={g.mana[my]}
@@ -573,6 +614,9 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
         End Turn →
       </button>
       <button className="resign-btn" onClick={onResign}>Resign</button>
+      <button className={'log-btn' + (showLog ? ' on' : '')} onClick={() => setShowLog((s) => !s)}>
+        ☰ Log
+      </button>
 
       {!myTurn && !g.winner && !g.draw && (
         <div className="turn-banner banner-fade" key={turnKey}>

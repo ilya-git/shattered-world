@@ -217,5 +217,24 @@ check(STATS.catapult.minRng === 5, 'catapult min range 5');
   check(allShiftable, 'amphis: every source has a reachable shifting spot');
 }
 
+
+// ---- battle log: heal applications merge into one entry ----
+{
+  let hg = createGame(21, 'control', 30, 'a');
+  const hs = summonCells(hg, 'a');
+  hg = applyAction(hg, { kind: 'summon', ut: 'healer', q: hs[0].q, r: hs[0].r });
+  hg = applyAction(hg, { kind: 'summon', ut: 'swordsman', q: hs[1].q, r: hs[1].r });
+  hg.units.find((u) => u.type === 'swordsman')!.hp = 5;
+  const healer = hg.units.find((u) => u.type === 'healer')!;
+  const swordId = hg.units.find((u) => u.type === 'swordsman')!.id;
+  const before = hg.log.length;
+  hg = applyAction(hg, { kind: 'heal', id: healer.id, targetId: swordId });
+  hg = applyAction(hg, { kind: 'heal', id: healer.id, targetId: swordId });
+  check(hg.units.find((u) => u.id === swordId)!.hp === 7, 'log: two mends heal 2');
+  check(hg.log.length === before + 1 && hg.log[hg.log.length - 1].text.includes('+2'),
+    'log: repeated mends merge into one entry (+2)');
+  check(hg.log.some((e) => e.kind === 'summon'), 'log: summons recorded');
+}
+
 console.log(failures ? `\n${failures} FAILURES` : '\nall good');
 process.exit(failures ? 1 : 0);
