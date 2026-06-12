@@ -101,6 +101,14 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
     return ok;
   };
 
+  const deselect = () => {
+    setSelId(null);
+    setMode('idle');
+    setSummonType(null);
+    setTranslocId(null);
+    setHover(null);
+  };
+
   const selectUnit = (u: Unit) => {
     setSelId(u.id);
     setSummonType(null);
@@ -115,6 +123,11 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
 
   const onCell = (q: number, r: number) => {
     const u = unitAt(g, q, r);
+    // clicking the selected unit again puts it down
+    if (u && sel && u.id === sel.id && mode !== 'heal') {
+      deselect();
+      return;
+    }
     if (!myTurn) {
       if (u) selectUnit(u);
       return;
@@ -202,9 +215,8 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
       selectUnit(u);
       return;
     }
-    setSelId(null);
-    setMode('idle');
-    setSummonType(null);
+    // clicked open ground with nothing to do there — put the unit down
+    deselect();
   };
 
   /* ---------- overlay ---------- */
