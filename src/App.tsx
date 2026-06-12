@@ -52,7 +52,11 @@ export default function App() {
   };
 
   const handleMessage = (msg: NetMessage) => {
-    if (msg.type === 'start') {
+    if (msg.type === 'lobby') {
+      // host's war-room choices, mirrored read-only on the guest
+      setMode(msg.mode);
+      setMapId(msg.mapId);
+    } else if (msg.type === 'start') {
       setMode(msg.mode);
       setMapId(msg.mapId);
       setGame(createGame(msg.seed, msg.mode, msg.startMana, 'a', msg.mapId));
@@ -87,6 +91,10 @@ export default function App() {
         setConnecting(false);
         setNetError(null);
         setRoute({ s: 'warroom' });
+        // the host announces its current table setup the moment the guest sits down
+        if (isHostRef.current) {
+          net.send({ type: 'lobby', mode: modeRef.current, mapId: mapRef.current });
+        }
       },
       onClose: () => {
         setNetError('Connection lost.');
@@ -158,9 +166,15 @@ export default function App() {
         isHost={isHost}
         code={code ?? ''}
         mode={mode}
-        onMode={setMode}
+        onMode={(m) => {
+          setMode(m);
+          if (!hotseat) netRef.current?.send({ type: 'lobby', mode: m, mapId });
+        }}
         mapId={mapId}
-        onMap={setMapId}
+        onMap={(m) => {
+          setMapId(m);
+          if (!hotseat) netRef.current?.send({ type: 'lobby', mode, mapId: m });
+        }}
         onBack={toTitle}
         onStart={() => {
           const seed = (Math.random() * 0x7fffffff) | 0;

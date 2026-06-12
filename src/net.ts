@@ -15,6 +15,7 @@ import type { GameAction, GameMode } from './game/engine';
 import type { MapId } from './game/maps';
 
 export type NetMessage =
+  | { type: 'lobby'; mode: GameMode; mapId: MapId }
   | { type: 'start'; seed: number; mode: GameMode; startMana: number; mapId: MapId }
   | { type: 'action'; action: GameAction }
   | { type: 'rematch' };
