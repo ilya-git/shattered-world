@@ -38,33 +38,12 @@ html, body { margin: 0; padding: 0; }
   clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
 .thex.e0 { z-index: 1; } .thex.e1 { z-index: 1; } .thex.e2 { z-index: 2; } .thex.e3 { z-index: 3; }
 
-/* desert mountains: the mountain texture warmed to red-brown */
-.thex.t-desert::before { content: ''; position: absolute; inset: 0; background: rgba(176,92,40,.42); mix-blend-mode: multiply; }
 
 /* portal faction rings (the texture has the ring; this tints allegiance) */
 .thex.t-portal.pa::after, .thex.t-portal.pb::after { content: ''; position: absolute; inset: 22%;
   border-radius: 50%; opacity: .75; pointer-events: none; }
 .thex.t-portal.pa::after { box-shadow: 0 0 0 2.5px var(--c-fa), 0 0 14px rgba(67,108,152,.6); }
 .thex.t-portal.pb::after { box-shadow: 0 0 0 2.5px var(--c-fb), 0 0 14px rgba(181,80,62,.6); }
-
-/* ramp: carved steps up the slope */
-.thex.t-ramp::before { content: ''; position: absolute; inset: 0; background: rgba(150,118,76,.28); }
-.ramp-mark { position: absolute; left: 24%; right: 24%; top: 26%; bottom: 26%;
-  background: repeating-linear-gradient(180deg, transparent 0 7px, rgba(59,51,38,.4) 7px 9px); }
-
-/* bridge: planks over the water */
-.thex.t-bridge::before { content: ''; position: absolute; inset: 0; background: rgba(40,60,70,.18); }
-.bridge-mark { position: absolute; left: -4%; right: -4%; top: 33%; bottom: 33%;
-  background: repeating-linear-gradient(90deg, #b39265 0 7px, #97784e 7px 9px);
-  border-top: 1.6px solid rgba(59,51,38,.55); border-bottom: 1.6px solid rgba(59,51,38,.55); }
-
-/* rainforest: clustered canopy blots over the grass */
-.forest-mark { position: absolute; inset: 0;
-  background:
-    radial-gradient(26% 30% at 32% 38%, rgba(46,84,44,.65), transparent 70%),
-    radial-gradient(30% 34% at 62% 30%, rgba(56,98,52,.6), transparent 70%),
-    radial-gradient(26% 30% at 50% 62%, rgba(40,76,40,.62), transparent 70%),
-    radial-gradient(22% 26% at 72% 58%, rgba(52,92,48,.55), transparent 70%); }
 
 /* mana source allegiance ring */
 .src-mark { position: absolute; width: calc(var(--hex, 64px) * 0.66); height: calc(var(--hex, 64px) * 0.66); transform: translate(-50%,-50%);

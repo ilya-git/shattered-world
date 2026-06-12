@@ -160,9 +160,9 @@ export interface Tip {
 
 /* ---------- the board ---------- */
 
-const TEX_FOR: Partial<Record<string, string>> = {
-  ramp: 'sand', bridge: 'water', forest: 'grass', desert: 'mountain',
-};
+// every terrain has its own tile in the tex3 set; only the internal
+// 'forest' key differs from the file name
+const TEX_FOR: Partial<Record<string, string>> = { forest: 'rainforest' };
 
 interface BoardProps {
   map: MapDef;
@@ -281,11 +281,7 @@ export function Board({ map, units = [], sources = [], battleMode, overlay, tip,
                 height: hexH,
                 backgroundImage: `url(${base}tex/${tex}.png)`,
               }}
-            >
-              {t === 'ramp' && <span className="ramp-mark"></span>}
-              {t === 'bridge' && <span className="bridge-mark"></span>}
-              {t === 'forest' && <span className="forest-mark"></span>}
-            </div>
+            ></div>
           );
         })}
         {sources.map((s) =>
