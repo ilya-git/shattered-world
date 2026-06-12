@@ -267,7 +267,8 @@ export function planeswalkCells(g: GameState, u: Unit): ReachCell[] {
 
 /* ---------- combat targeting ---------- */
 
-const defenderAura = (g: GameState, d: Unit): number =>
+/** +2 DEF beside a friendly Defender ("bonuses don't stack"). */
+export const defenderAura = (g: GameState, d: Unit): number =>
   g.units.some(
     (o) => o.faction === d.faction && o.id !== d.id && o.type === 'defender' && hexDist(o, d) === 1,
   )

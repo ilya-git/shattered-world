@@ -401,6 +401,13 @@ html, body { margin: 0; padding: 0; }
   font-size: calc(var(--hex, 64px) * 0.24); line-height: 1; color: #5a7a44; font-weight: 700; }
 
 .wc-dock.dim { opacity: .55; filter: saturate(.5); }
+
+/* shield stamp on units standing in a Defender's guard aura */
+.tok-guard { position: absolute; left: -9%; top: -9%; width: 40%; height: 40%; z-index: 7;
+  border-radius: 50%; background: var(--wc-paper); border: calc(var(--hex, 64px) * 0.022) solid var(--wc-ink);
+  display: flex; align-items: center; justify-content: center; color: var(--c-fa);
+  box-shadow: 0 0 6px rgba(67,108,152,.55); }
+.tok-guard .ic { width: 70%; height: 70%; }
 .hint-k.urgent { color: var(--wc-accent); opacity: 1; }
 .resign-btn { position: absolute; z-index: 10; left: 18px; bottom: 18px; border: 1.4px solid var(--wc-ink-soft); background: transparent; color: var(--wc-ink);
   padding: 8px 14px; border-radius: 4px; font-family: 'IM Fell English', serif; font-size: 12px; cursor: pointer; opacity: .65; }

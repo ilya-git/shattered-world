@@ -121,6 +121,8 @@ export interface DisplayUnit {
   sel?: boolean;
   faded?: boolean;
   spent?: boolean;
+  /** standing in a friendly Defender's guard aura (+2 DEF) */
+  guarded?: boolean;
 }
 
 function Token({ u, geom }: { u: DisplayUnit; geom: BoardGeom }) {
@@ -140,6 +142,11 @@ function Token({ u, geom }: { u: DisplayUnit; geom: BoardGeom }) {
         </span>
       </div>
       {u.spent && <span className="tok-done">✓</span>}
+      {u.guarded && (
+        <span className="tok-guard" title="+2 DEF — guarded by a Defender">
+          <Icon type="defender" />
+        </span>
+      )}
       <div className="wc-hp">
         <div className="wc-hp-fill" style={{ width: pct + '%' }}></div>
       </div>

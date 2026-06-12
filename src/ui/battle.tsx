@@ -6,8 +6,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { DIRS, hexDist, keyOf, type Hex } from '../game/hex';
 import { STATS, halfCost, type Faction, type UnitType } from '../game/data';
 import {
-  attackTargets, canSummon, mapOf, planeswalkCells, reachableCells, shiftTargets,
-  summonCells, translocateDests, unitAt, unitCanAct,
+  attackTargets, canSummon, defenderAura, mapOf, planeswalkCells, reachableCells,
+  shiftTargets, summonCells, translocateDests, unitAt, unitCanAct,
   type GameAction, type GameState, type Unit,
 } from '../game/engine';
 import { hexesOf, type MapDef } from '../game/maps';
@@ -299,6 +299,13 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
     if (sel && sel.faction !== my) {
       cells.push({ q: sel.q, r: sel.r, cls: 'inspect' });
     }
+    // a selected Defender shows its guard aura — allies inside glow shielded
+    if (sel?.type === 'defender') {
+      within(map, sel, 1).forEach((c) => {
+        const u = unitAt(g, c.q, c.r);
+        cells.push({ q: c.q, r: c.r, cls: u && u.faction === sel.faction ? 'guard guard-on' : 'guard' });
+      });
+    }
     return { cells, line, lineCls, arrow, reticle };
   }, [g, map, sel, mode, hover, myTurn, my, summonType, translocId]);
 
@@ -326,6 +333,7 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
     hp: u.hp, maxHp: STATS[u.type].life,
     sel: sel?.id === u.id,
     spent: myTurn && u.faction === my && !readySet.has(u.id),
+    guarded: defenderAura(g, u) > 0,
   }));
 
   const tip: Tip | null =
@@ -334,10 +342,16 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
           const u = unitAt(g, hover.q, hover.r);
           if (!u || u.faction === my) return null;
           const s = STATS[u.type];
+          const aura = defenderAura(g, u);
           return {
             q: u.q, r: u.r, faction: u.faction, name: s.name,
-            stats: [['LIFE', u.hp + '/' + s.life], ['ATK', s.atk ?? '—'], ['DEF', s.def], ['RNG', s.rng]],
-            note: s.special,
+            stats: [
+              ['LIFE', u.hp + '/' + s.life],
+              ['ATK', s.atk ?? '—'],
+              ['DEF', aura ? `${s.def}+${aura}` : s.def],
+              ['RNG', s.rng],
+            ],
+            note: aura ? `${s.special} · guarded by a Defender` : s.special,
           } as Tip;
         })()
       : null;
@@ -346,6 +360,7 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
   let actions: CardAction[] | null = null;
   if (sel) {
     const s = STATS[sel.type];
+    const aura = defenderAura(g, sel);
     card = {
       type: sel.type,
       faction: sel.faction,
@@ -355,10 +370,10 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
         ['MOV', sel.faction === my && myTurn ? `${sel.movePts}` : `${s.move}`],
         ['LIFE', `${sel.hp}`],
         ['ATK', s.atk === null ? '—' : `${s.atk}`],
-        ['DEF', `${s.def}`],
+        ['DEF', aura ? `${s.def}+${aura}` : `${s.def}`],
         ['RNG', `${s.rng}`],
       ] as Array<[string, string]>,
-      special: s.special,
+      special: aura ? <>{s.special} <i>· guarded: +{aura} DEF from an adjacent Defender</i></> : s.special,
       spLabel: s.spLabel,
     };
     if (sel.faction === my && myTurn) {
