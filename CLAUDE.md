@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Follow the project guide in [AGENTS.md](AGENTS.md).
+@AGENTS.md
 
 The one rule that outranks everything: **`Rules.docx` is the authoritative
 game specification.** Any code change affecting gameplay must be checked
