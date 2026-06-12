@@ -11,12 +11,17 @@ ink-&-watercolor direction from the Claude Design handoff
 
 ## The game
 
-Two battlefields, picked by the host in the war room:
+Four battlefields, picked by the host in the war room (all 180°-symmetric
+for fairness; the big three share the same canvas and support pan & zoom):
 
 - **Sundered Isle** — a compact symmetric island for quick duels.
 - **World of Amphis** — the sample map from the rulebook, extracted hex-by-hex
   from the image embedded in Rules.docx (terrain, the 9 marked sources and
-  both 7-hex summoning portals), with pan & zoom on the board.
+  both 7-hex summoning portals).
+- **The Shardsea** — an archipelago of bridged isles around a hub; fight for
+  the bridge lanes.
+- **The Worldspine** — a high stone caldera over open woodland; three pylons
+  sit behind its four ramp passes.
 
 Victory modes:
 

@@ -10,7 +10,7 @@
 import { hexKey, type Hex } from './hex';
 import type { Faction, Terrain } from './data';
 
-export type MapId = 'isle' | 'amphis';
+export type MapId = 'isle' | 'amphis' | 'shards' | 'spine';
 
 export interface MapDef {
   id: MapId;
@@ -136,11 +136,11 @@ function oddrToAxial(col: number, row: number): Hex {
   return { q: col - ((row - (row & 1)) / 2), r: row };
 }
 
-function buildAmphis(): { terrain: ReadonlyMap<string, Terrain>; sources: Hex[]; portals: Record<Faction, Hex[]> } {
+function buildRows(rows: string[]): { terrain: ReadonlyMap<string, Terrain>; sources: Hex[]; portals: Record<Faction, Hex[]> } {
   const terrain = new Map<string, Terrain>();
   const sources: Hex[] = [];
   const portals: Record<Faction, Hex[]> = { a: [], b: [] };
-  AMPHIS_ROWS.forEach((line, row) => {
+  rows.forEach((line, row) => {
     for (let col = 0; col < line.length; col++) {
       const ch = line[col];
       if (ch === '.') continue;
@@ -156,9 +156,115 @@ function buildAmphis(): { terrain: ReadonlyMap<string, Terrain>; sources: Hex[];
   return { terrain, sources, portals };
 }
 
+
+/* ============ The Shardsea (generated, 180°-symmetric) ============ */
+// An archipelago on the Amphis silhouette: a hub isle ringed by six shards,
+// joined by bridge lanes. Mountain crowns and desert knuckles guard the
+// flanking sources; every island heart holds a pylon.
+const SHARDS_ROWS: string[] = [
+  '...................ww......ww',
+  '..........ww......www..wwwwww',
+  '..........www...wwwwww.wwwwwwwww',
+  '.......wwwwwwwwwwwwwwwwwwwwwwwww',
+  '.......wwwwwwwwwwwwwwwwwwwwwwwww',
+  '.......wwwwwwwwwwwwwwwwwwwwwwww',
+  '........wwwwwwwwwwwwwwwwwwwwwwwo..BB',
+  '.......wwwwwwwwwwwwwwwwwwwwwwwg..BBB',
+  '.......wwwwwwwwwwwssssswwwwwwwwsggBBg',
+  '.......wwwwwwwwwwgfgggswwwssssgfgggg',
+  '.......wwwwwwwwwwsfgffgfwwsggggggfgg',
+  '....wwwwwwwwwwwwgggmmggswsfggfgfggfg',
+  '....wwwwwwwwwwwwgggmomggfsgggggggwww',
+  '...wwwwwwwwwwwwwsgfrmggsgggfogfggww',
+  '....wwwwwwwwwwwwwsggfggsbgfgggffswww',
+  '...wwwsggsgwwwwwwgggggsbwgggggggwwwww',
+  '...wwwggggggwwwwwggfggfswwggfggswwwwww',
+  '...wwsddfgggwwwwsfgggfggwwfggfswwwwwww',
+  '....wgdodggfgwwwsggggfgggwwwwbwwwwwwwwwww',
+  '...wsgddrggfswwsfgggggfggwwwbwwwwwwwwwwww',
+  '.wwwwgggggggswwsgfgggggggswwbwwwwwwwwwwww',
+  'wwwwwgggffggbbggggfggfgffswbwgsfggwwwwww',
+  '.wwwwwgggggswbsgggggogggggsbwsgggggwwwww',
+  'wwwwwwggfsgwbwsffgfggfggggbbggffgggwwwww',
+  'wwwwwwwwwwwwbwwsgggggggfgswwsgggggggwwww',
+  'wwwwwwwwwwwbwwwggfgggggfswwsfggrddgsw',
+  '.wwwwwwwwwwbwwwwgggfggggswwwgfggdodgw',
+  '..wwwwwwwsfggfwwggfgggfswwwwgggfddsww',
+  '...wwwwwwsggfggwwsfggfggwwwwwggggggwww',
+  '....wwwwgggggggwbsgggggwwwwwwgsggswww',
+  '.....wwwsffgggfgbsggfggswwwwwwwwwwwww',
+  '.....wwggfgofgggsggmrfgswwwwwwwwwwwww',
+  '.....wwwgggggggsfggmomgggwwwwwwwwwwww',
+  '....gfggfgfggfswsggmmgggwwwwwwwwwwww',
+  '.....ggfggggggswwfgffgfswwwwwwwwww',
+  '....ggggfgsssswwwsgggfgwwwwwwwwww',
+  '....gAAggswwwwwwwwssssswwwwwwwwwww',
+  '....AAA..gwwwwwwwwwwwwwwwwwwwwwww',
+  '.....AA..owwwwwwwwwwwwwwwwwwwwwwww',
+  '.........wwwwwwwwwwwwwwwwwwwwwwww',
+  '.........wwwwwwwwwwwwwwwwwwwwwwwww',
+  '.........wwwwwwwwwwwwwwwwwwwwwwww',
+  '..........wwwwwwww.wwwwww...www',
+  '...........wwwwww..www......ww',
+  '............ww',
+];
+
+/* ============ The Worldspine (generated, 180°-symmetric) ============ */
+// A high stone caldera over open woodland. Three pylons sit inside the bowl
+// behind four ramp passes; lakes, woods and highland spurs shape the plains.
+const SPINE_ROWS: string[] = [
+  '...................gg......gg',
+  '..........gg......ggg..gggggg',
+  '..........ggg...gggggg.ggggggggg',
+  '.......gggggsssgggggggggggggggss',
+  '.......gggggssssggggggggggggggss',
+  '.......ggggsssssgggggggggggggss',
+  '........ggggssssgggggwwwfffgggs...BB',
+  '.......gggggssfffgggwwwwfffgggs..BBB',
+  '.......gggggggffffggbbbbbfffggggggBBg',
+  '.......gggwwwfffffggwwwwffffgggggggg',
+  '.......gggwwwwffffgggwwwfffffggggggg',
+  '....gggggbbbbbfffgggggggfffffgggsssg',
+  '....ggggggwwwwmggggggggggfffowwwosss',
+  '...ggggggmwwwmmggggggggggfffwwwwsss',
+  '....gggggmmmmmmgggggggggggggbbbbbsss',
+  '...gggggmmmmmmggggggggggggggwwwwsssgg',
+  '...ggggggmomrggggdmrrrmmggggfwwwgggggg',
+  '...ggggggmmmggggmmmrrdmdgggffffggggggg',
+  '....ggggggggggggdmsssssmdggffffffffgggggg',
+  '...ggggggggggggmdssssssmdggffffffffgggggg',
+  '.ggggggggggggggdmossssssmmggffffffffggggg',
+  'ggggggggggggggddssssssssdmgggggffffggggg',
+  '.gggggfffgggggmdssssossssdmgggggfffggggg',
+  'gggggffffgggggmdssssssssddgggggggggggggg',
+  'gggggffffffffggmmssssssomdgggggggggggggg',
+  'gggggffffffffggdmssssssdmgggggggggggg',
+  '.gggggffffffffggdmsssssmdgggggggggggg',
+  '..gggggggffffgggdmdrrmmmggggmmmgggggg',
+  '...ggggggwwwfggggmmrrrmdggggrmomgggggg',
+  '....gssswwwwggggggggggggggmmmmmmggggg',
+  '.....sssbbbbbgggggggggggggmmmmmmggggg',
+  '.....ssswwwwfffggggggggggmmwwwmgggggg',
+  '.....sssowwwofffggggggggggmwwwwgggggg',
+  '....gsssgggfffffgggggggfffbbbbbggggg',
+  '.....gggggggfffffwwwgggffffwwwwggg',
+  '....ggggggggffffwwwwggfffffwwwggg',
+  '....gAAggggggfffbbbbbggffffggggggg',
+  '....AAA..sgggfffwwwwgggfffssggggg',
+  '.....AA...sgggfffwwwgggggssssggggg',
+  '.........ssgggggggggggggsssssgggg',
+  '.........ssggggggggggggggssssggggg',
+  '.........sgggggggggggggggsssggggg',
+  '..........gggggggg.gggggg...ggg',
+  '...........gggggg..ggg......gg',
+  '............gg',
+];
+
 /* ================= registry ================= */
 
-const amphis = buildAmphis();
+const amphis = buildRows(AMPHIS_ROWS);
+const shards = buildRows(SHARDS_ROWS);
+const spine = buildRows(SPINE_ROWS);
 
 export const MAPS: Record<MapId, MapDef> = {
   isle: {
@@ -181,9 +287,29 @@ export const MAPS: Record<MapId, MapDef> = {
     sources: amphis.sources,
     portals: amphis.portals,
   },
+  shards: {
+    id: 'shards',
+    name: 'The Shardsea',
+    blurb: 'bridged isles around a hub — fight for the lanes',
+    orient: 'pointy',
+    hexSize: 18,
+    terrain: shards.terrain,
+    sources: shards.sources,
+    portals: shards.portals,
+  },
+  spine: {
+    id: 'spine',
+    name: 'The Worldspine',
+    blurb: 'a stone caldera over open woodland — hold the passes',
+    orient: 'pointy',
+    hexSize: 18,
+    terrain: spine.terrain,
+    sources: spine.sources,
+    portals: spine.portals,
+  },
 };
 
-export const MAP_LIST: MapDef[] = [MAPS.isle, MAPS.amphis];
+export const MAP_LIST: MapDef[] = [MAPS.isle, MAPS.amphis, MAPS.shards, MAPS.spine];
 
 export function hexesOf(map: MapDef): Array<Hex & { t: Terrain }> {
   return [...map.terrain.entries()].map(([k, t]) => {

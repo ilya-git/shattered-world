@@ -211,7 +211,7 @@ export function WarRoom({ isHost, code, mode, onMode, mapId, onMap, onStart, onB
         <div className="lobby-mid">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div className="map-thumb"><HeroMap mapId={mapId} /></div>
-            <div className="mode-pick">
+            <div className="mode-pick map-pick">
               {MAP_LIST.map((m) => (
                 <button
                   key={m.id}
