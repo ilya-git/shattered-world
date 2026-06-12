@@ -23,14 +23,31 @@ interface Handlers {
   onError?: (message: string) => void;
 }
 
+// TURN relay for restrictive NATs (mobile/CGNAT, corporate firewalls) — STUN
+// alone can't connect those, and as of mid-2026 no TURN service works without
+// an account (PeerJS's bundled eu-0/us-0.turn.peerjs.com relays are gone from
+// DNS; the anonymous openrelay endpoints stopped allocating). To enable:
+// create a free account (e.g. https://dashboard.metered.ca/signup, 20 GB/mo),
+// paste the static credentials below, and redeploy. Until then the game works
+// exactly as before, STUN-only. Note the credentials end up readable in the
+// shipped bundle — fine for a quota-capped hobby relay.
+const TURN_URLS: string[] = [
+  // e.g. with Metered:
+  // 'turn:standard.relay.metered.ca:80',
+  // 'turn:standard.relay.metered.ca:443',
+  // 'turns:standard.relay.metered.ca:443?transport=tcp', // strict firewalls
+];
+const TURN_USERNAME = '';
+const TURN_CREDENTIAL = '';
+
 // Fresh options object per Peer — PeerJS may mutate what it's given, so the
 // host and guest must not share one reference.
 function peerOptions() {
-  return {
-    config: {
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
-    },
-  };
+  const iceServers: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
+  if (TURN_URLS.length > 0 && TURN_USERNAME && TURN_CREDENTIAL) {
+    iceServers.push({ urls: TURN_URLS, username: TURN_USERNAME, credential: TURN_CREDENTIAL });
+  }
+  return { config: { iceServers } };
 }
 
 export class Net {
