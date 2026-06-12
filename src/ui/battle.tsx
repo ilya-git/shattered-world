@@ -6,11 +6,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { DIRS, hexDist, keyOf, type Hex } from '../game/hex';
 import { STATS, halfCost, type Faction, type UnitType } from '../game/data';
 import {
-  attackTargets, planeswalkCells, reachableCells, shiftTargets, summonCells,
+  attackTargets, mapOf, planeswalkCells, reachableCells, shiftTargets, summonCells,
   translocateDests, unitAt,
   type GameAction, type GameState, type Unit,
 } from '../game/engine';
-import { ALL_HEXES, ON_BOARD } from '../game/map';
+import { hexesOf, type MapDef } from '../game/maps';
 import { Board, type DisplayUnit, type Overlay, type OverlayCell, type Tip } from './board';
 import { CombatPanel, Screen, SummonDock, TopBar, UnitCard, type CardAction } from './panels';
 
@@ -18,8 +18,8 @@ type UiMode =
   | 'idle' | 'move' | 'planeswalk' | 'attack' | 'shift'
   | 'heal' | 'wound' | 'transloc-pick' | 'transloc-dest' | 'banish' | 'summon';
 
-const within = (o: Hex, n: number): Hex[] =>
-  ALL_HEXES.filter((h) => {
+const within = (map: MapDef, o: Hex, n: number): Hex[] =>
+  hexesOf(map).filter((h) => {
     const d = hexDist(o, h);
     return d >= 1 && d <= n;
   });
@@ -55,6 +55,7 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
 }) {
   const my: Faction = hotseat ? g.turn : me;
   const myTurn = (hotseat || g.turn === me) && !g.winner && !g.draw;
+  const map = mapOf(g);
 
   const [selId, setSelId] = useState<number | null>(null);
   const [mode, setMode] = useState<UiMode>('idle');
@@ -244,7 +245,7 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
         const ts = attackTargets(g, sel);
         const tKeys = new Set(ts.map(keyOf));
         // faint ring of in-range hexes (respecting catapult's blind spot)
-        within(sel, s.rng).forEach((c) => {
+        within(map, sel, s.rng).forEach((c) => {
           const d = hexDist(sel, c);
           if (s.minRng && d < s.minRng) return;
           if (s.rng === 1) return;
@@ -263,15 +264,13 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
           lineCls = sel.type === 'catapult' ? 'lob' : 'atk';
           arrow = true;
           if (sel.type === 'catapult') {
-            within(hover, 1).forEach((c) => {
-              if (ON_BOARD(c.q, c.r)) cells.push({ q: c.q, r: c.r, cls: 'splash' });
-            });
+            within(map, hover, 1).forEach((c) => cells.push({ q: c.q, r: c.r, cls: 'splash' }));
           }
         }
       } else if (mode === 'shift') {
         shiftTargets(g, sel).forEach((s) => cells.push({ q: s.q, r: s.r, cls: 'shift shift-to' }));
       } else if (mode === 'heal' || mode === 'wound') {
-        within(sel, STATS.healer.rng).forEach((c) => {
+        within(map, sel, STATS.healer.rng).forEach((c) => {
           const u = unitAt(g, c.q, c.r);
           const good = u && (mode === 'heal' ? u.faction === my : u.faction !== my);
           cells.push({ q: c.q, r: c.r, cls: good ? (mode === 'heal' ? 'heal heal-on' : 'atk') : 'heal' });
@@ -280,7 +279,7 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
           cells.push({ q: sel.q, r: sel.r, cls: 'heal heal-on' });
         }
       } else if (mode === 'transloc-pick') {
-        within(sel, 1).forEach((c) => {
+        within(map, sel, 1).forEach((c) => {
           const u = unitAt(g, c.q, c.r);
           if (u && u.faction === my) cells.push({ q: c.q, r: c.r, cls: 'guard guard-on', label: `✦${halfCost(u.type)}` });
         });
@@ -291,7 +290,7 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
           if (t) cells.push({ q: t.q, r: t.r, cls: 'shift shift-from' });
         }
       } else if (mode === 'banish') {
-        within(sel, STATS.translocator.rng).forEach((c) => {
+        within(map, sel, STATS.translocator.rng).forEach((c) => {
           const u = unitAt(g, c.q, c.r);
           if (u && u.faction !== my) cells.push({ q: c.q, r: c.r, cls: 'atk', label: `✦${halfCost(u.type)}` });
         });
@@ -301,7 +300,7 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
       cells.push({ q: sel.q, r: sel.r, cls: 'inspect' });
     }
     return { cells, line, lineCls, arrow, reticle };
-  }, [g, sel, mode, hover, myTurn, my, summonType, translocId]);
+  }, [g, map, sel, mode, hover, myTurn, my, summonType, translocId]);
 
   /* ---------- card ---------- */
 
@@ -431,6 +430,7 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
   return (
     <Screen className="battle play" label="Battle">
       <Board
+        map={map}
         units={units}
         sources={g.sources}
         battleMode={g.mode === 'battle'}

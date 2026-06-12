@@ -6,8 +6,8 @@ import { Board, type DisplayUnit } from './board';
 import { Screen, Die } from './panels';
 import { Icon } from './icons';
 import type { Faction, UnitType } from '../game/data';
-import type { FactionStats, GameMode, GameState } from '../game/engine';
-import { SOURCE_HEXES } from '../game/map';
+import { mapOf, type FactionStats, type GameMode, type GameState } from '../game/engine';
+import { MAPS, MAP_LIST, type MapId } from '../game/maps';
 
 /* ---------- hero board: a staged mid-game scene as title art ---------- */
 
@@ -22,15 +22,20 @@ const HERO_UNITS: DisplayUnit[] = [
   { id: 8, q: 3, r: -1, type: 'planeswalker', faction: 'b', hp: 8, maxHp: 8 },
 ];
 
-const HERO_SOURCES = SOURCE_HEXES.map((s, i) => ({
+const HERO_SOURCES = MAPS.isle.sources.map((s, i) => ({
   ...s,
   owner: (i % 3 === 0 ? 'a' : i % 3 === 1 ? 'b' : null) as Faction | null,
 }));
 
-export function HeroMap() {
+export function HeroMap({ mapId = 'isle' as MapId }: { mapId?: MapId }) {
+  const isIsle = mapId === 'isle';
   return (
     <div className="hero-stage">
-      <Board units={HERO_UNITS} sources={HERO_SOURCES} />
+      <Board
+        map={MAPS[mapId]}
+        units={isIsle ? HERO_UNITS : []}
+        sources={isIsle ? HERO_SOURCES : MAPS[mapId].sources.map((s) => ({ ...s, owner: null }))}
+      />
     </div>
   );
 }
@@ -175,11 +180,13 @@ export const MODES: Array<{ id: GameMode; t: string; s: string }> = [
   { id: 'battle', t: 'Battle', s: 'no sources — annihilate the enemy' },
 ];
 
-export function WarRoom({ isHost, code, mode, onMode, onStart, onBack }: {
+export function WarRoom({ isHost, code, mode, onMode, mapId, onMap, onStart, onBack }: {
   isHost: boolean;
   code: string;
   mode: GameMode;
   onMode: (m: GameMode) => void;
+  mapId: MapId;
+  onMap: (m: MapId) => void;
   onStart: () => void;
   onBack: () => void;
 }) {
@@ -202,7 +209,22 @@ export function WarRoom({ isHost, code, mode, onMode, onStart, onBack }: {
           </div>
         </div>
         <div className="lobby-mid">
-          <div className="map-thumb"><HeroMap /></div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div className="map-thumb"><HeroMap mapId={mapId} /></div>
+            <div className="mode-pick">
+              {MAP_LIST.map((m) => (
+                <button
+                  key={m.id}
+                  className={'mode' + (mapId === m.id ? ' on' : '')}
+                  disabled={!isHost}
+                  onClick={() => onMap(m.id)}
+                >
+                  <span className="mode-t">{m.name}</span>
+                  <span className="mode-s">{m.blurb}</span>
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="lobby-rules-mini">
             <div className="lrm-h">{isHost ? 'choose the contest' : 'this table'}</div>
             <div className="mode-pick" style={{ flexDirection: 'column' }}>
@@ -337,7 +359,7 @@ export function OutcomeScreen({ g, me, names, onRematch, onMenu, rematchWaiting 
   const myStats: FactionStats = g.stats[me];
   return (
     <Screen className={'outcome ' + (win || draw ? 'win' : 'lose')} label={win ? 'Victory' : 'Defeat'}>
-      <div className="outcome-map"><Board units={[]} sources={g.sources} battleMode={g.mode === 'battle'} /></div>
+      <div className="outcome-map"><Board map={mapOf(g)} units={[]} sources={g.sources} battleMode={g.mode === 'battle'} /></div>
       <div className="outcome-scrim"></div>
       <div className="outcome-inner">
         <BigCrest faction={win ? me : g.winner ?? me} broken={!win && !draw} />

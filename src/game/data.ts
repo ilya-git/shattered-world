@@ -98,25 +98,25 @@ export const halfCost = (t: UnitType): number => Math.ceil(STATS[t].cost / 2);
 export type Terrain =
   | 'grass' | 'water' | 'sand' | 'forest'
   | 'source' | 'portal' | 'bridge' | 'ramp'
-  | 'mountain';
+  | 'mountain' | 'desert';
 
 /** Elevation grade: 1 low, 2 mid, 3 high. Move/melee allowed across ≤1 grade. */
 export const GRADE: Record<Terrain, 1 | 2 | 3> = {
   grass: 1, water: 1, sand: 1, forest: 1,
   source: 2, portal: 2, bridge: 2, ramp: 2,
-  mountain: 3,
+  mountain: 3, desert: 3,
 };
 
 /** Can a unit stand on / move through this terrain? */
 export const PASSABLE: Record<Terrain, boolean> = {
   grass: true, water: false, sand: true, forest: true,
   source: false, portal: true, bridge: true, ramp: true,
-  mountain: true,
+  mountain: true, desert: true,
 };
 
 /** Stacking order for the painted tiles (water sits lowest). */
 export const ZLAYER: Record<Terrain, number> = {
   water: 0, grass: 1, sand: 1, forest: 1,
   source: 2, portal: 2, bridge: 2, ramp: 2,
-  mountain: 3,
+  mountain: 3, desert: 3,
 };

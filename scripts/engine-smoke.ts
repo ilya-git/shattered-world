@@ -3,8 +3,11 @@ import {
   applyAction, attackTargets, createGame, planeswalkCells, reachableCells,
   shiftTargets, summonCells, type GameAction, type GameState,
 } from '../src/game/engine';
-import { PORTALS, SOURCE_HEXES } from '../src/game/map';
+import { MAPS } from '../src/game/maps';
 import { STATS } from '../src/game/data';
+
+const PORTALS = MAPS.isle.portals;
+const SOURCE_HEXES = MAPS.isle.sources;
 
 let failures = 0;
 function check(cond: unknown, label: string): void {
@@ -166,6 +169,23 @@ const highFoe = { id: 100, type: 'barbarian' as const, faction: 'b' as const, q:
 eg.units.push(gsword, highFoe);
 check(attackTargets(eg, gsword).length === 0, 'melee blocked across two elevation grades');
 check(STATS.catapult.minRng === 5, 'catapult min range 5');
+
+
+// ---- World of Amphis (rulebook sample map) sanity ----
+{
+  const am = MAPS.amphis;
+  check(am.sources.length === 9, 'amphis: 9 sources');
+  check(am.portals.a.length === 7 && am.portals.b.length === 7, 'amphis: 7-hex portals');
+  const ag = createGame(11, 'control', 30, 'a', 'amphis');
+  check(ag.sources.length === 9, 'amphis: game starts with 9 neutral sources');
+  const cells = summonCells(ag, 'a');
+  check(cells.length === 7, 'amphis: 7 free summon hexes');
+  let g2 = applyAction(ag, { kind: 'summon', ut: 'planeswalker', q: cells[0].q, r: cells[0].r });
+  const pw2 = g2.units[0];
+  check(planeswalkCells(g2, pw2).length > 0, 'amphis: planeswalk works');
+  const r2 = reachableCells(g2, pw2);
+  check(r2.length > 0, 'amphis: movement works on the big map');
+}
 
 console.log(failures ? `\n${failures} FAILURES` : '\nall good');
 process.exit(failures ? 1 : 0);

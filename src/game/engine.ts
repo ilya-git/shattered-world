@@ -13,7 +13,7 @@ import {
   GRADE, PASSABLE, STATS, halfCost, other,
   type Faction, type Terrain, type UnitType,
 } from './data';
-import { ON_BOARD, PORTALS, SOURCE_HEXES, TERRAIN_AT } from './map';
+import { MAPS, type MapDef, type MapId } from './maps';
 
 export type GameMode = 'control' | 'gathering' | 'battle';
 
@@ -59,6 +59,7 @@ export interface Combat {
 
 export interface GameState {
   mode: GameMode;
+  mapId: MapId;
   startMana: number;
   /** Gathering: win when your mana reaches this. */
   goalMana: number;
@@ -120,8 +121,10 @@ function rollD6(g: GameState): number {
 
 /* ---------- helpers ---------- */
 
-export const terrainAt = (q: number, r: number): Terrain | undefined =>
-  TERRAIN_AT.get(hexKey(q, r));
+export const mapOf = (g: GameState): MapDef => MAPS[g.mapId];
+
+export const terrainAt = (g: GameState, q: number, r: number): Terrain | undefined =>
+  mapOf(g).terrain.get(hexKey(q, r));
 
 export const unitAt = (g: GameState, q: number, r: number): Unit | undefined =>
   g.units.find((u) => u.q === q && u.r === r);
@@ -152,11 +155,12 @@ function mkUnit(g: GameState, type: UnitType, faction: Faction, q: number, r: nu
   return u;
 }
 
-export function createGame(seed: number, mode: GameMode, startMana: number, first: Faction): GameState {
+export function createGame(seed: number, mode: GameMode, startMana: number, first: Faction, mapId: MapId = 'isle'): GameState {
   const sources: SourceState[] =
-    mode === 'battle' ? [] : SOURCE_HEXES.map((s) => ({ ...s, owner: null }));
+    mode === 'battle' ? [] : MAPS[mapId].sources.map((s) => ({ ...s, owner: null }));
   return {
     mode,
+    mapId,
     startMana,
     goalMana: startMana * 2,
     units: [],
@@ -182,7 +186,7 @@ export function createGame(seed: number, mode: GameMode, startMana: number, firs
 
 /** In Battle mode the source hexes revert to plain grass. */
 export function effectiveTerrain(g: GameState, q: number, r: number): Terrain | undefined {
-  const t = terrainAt(q, r);
+  const t = terrainAt(g, q, r);
   if (t === 'source' && g.mode === 'battle') return 'grass';
   return t;
 }
@@ -229,7 +233,7 @@ export function reachableCells(g: GameState, u: Unit): ReachCell[] {
     for (const [dq, dr] of DIRS) {
       const n = { q: c.q + dq, r: c.r + dr };
       const k = keyOf(n);
-      if (!ON_BOARD(n.q, n.r) || !standable(g, n.q, n.r) || !gradeOk(g, c, n)) continue;
+      if (!mapOf(g).terrain.has(k) || !standable(g, n.q, n.r) || !gradeOk(g, c, n)) continue;
       const nd = d + 1;
       if (nd <= budget && nd < (dist.get(k) ?? Infinity)) {
         dist.set(k, nd);
@@ -251,7 +255,7 @@ export function planeswalkCells(g: GameState, u: Unit): ReachCell[] {
   if (u.type !== 'planeswalker' || u.moveActs <= 0 || u.moveLocked) return [];
   const budget = g.mana[u.faction];
   const out: ReachCell[] = [];
-  for (const [k] of TERRAIN_AT) {
+  for (const [k] of mapOf(g).terrain) {
     const [q, r] = k.split(',').map(Number);
     const d = hexDist(u, { q, r });
     if (d >= 1 && d <= budget && standable(g, q, r)) {
@@ -301,12 +305,12 @@ export function shiftTargets(g: GameState, u: Unit): SourceState[] {
 }
 
 export function summonCells(g: GameState, f: Faction): Hex[] {
-  return PORTALS[f].filter((p) => !unitAt(g, p.q, p.r));
+  return mapOf(g).portals[f].filter((p) => !unitAt(g, p.q, p.r));
 }
 
 export function translocateDests(g: GameState, t: Unit): Hex[] {
   const out: Hex[] = [];
-  for (const [k] of TERRAIN_AT) {
+  for (const [k] of mapOf(g).terrain) {
     const [q, r] = k.split(',').map(Number);
     const d = hexDist(t, { q, r });
     if (d >= 1 && d <= STATS.translocator.rng && standable(g, q, r)) out.push({ q, r });

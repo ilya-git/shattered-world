@@ -11,6 +11,15 @@ ink-&-watercolor direction from the Claude Design handoff
 
 ## The game
 
+Two battlefields, picked by the host in the war room:
+
+- **Sundered Isle** — a compact symmetric island for quick duels.
+- **World of Amphis** — the sample map from the rulebook, extracted hex-by-hex
+  from the image embedded in Rules.docx (terrain, the 9 marked sources and
+  both 7-hex summoning portals), with pan & zoom on the board.
+
+Victory modes:
+
 - **Control** (default) — shift the nine mana **Sources** to your side and hold
   all of them for **3 continuous turns**.
 - **The Gathering** — be the first to double the starting mana (the second

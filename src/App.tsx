@@ -8,6 +8,7 @@ import {
   applyAction, createGame, RuleError,
   type GameAction, type GameMode, type GameState,
 } from './game/engine';
+import type { MapId } from './game/maps';
 import type { Faction } from './game/data';
 import { BattleScreen } from './ui/battle';
 import { HostScreen, JoinScreen, OutcomeScreen, RulesScreen, TitleScreen, WarRoom } from './ui/screens';
@@ -30,6 +31,7 @@ export default function App() {
   const [netError, setNetError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [mode, setMode] = useState<GameMode>('control');
+  const [mapId, setMapId] = useState<MapId>('isle');
   const [game, setGame] = useState<GameState | null>(null);
   const [rematchAsked, setRematchAsked] = useState(false);
 
@@ -40,9 +42,11 @@ export default function App() {
   isHostRef.current = isHost;
   const modeRef = useRef(mode);
   modeRef.current = mode;
+  const mapRef = useRef(mapId);
+  mapRef.current = mapId;
 
-  const startLocal = (seed: number, m: GameMode) => {
-    setGame(createGame(seed, m, startManaFor(m), 'a'));
+  const startLocal = (seed: number, m: GameMode, mp: MapId) => {
+    setGame(createGame(seed, m, startManaFor(m), 'a', mp));
     setRematchAsked(false);
     setRoute({ s: 'battle' });
   };
@@ -50,7 +54,8 @@ export default function App() {
   const handleMessage = (msg: NetMessage) => {
     if (msg.type === 'start') {
       setMode(msg.mode);
-      setGame(createGame(msg.seed, msg.mode, msg.startMana, 'a'));
+      setMapId(msg.mapId);
+      setGame(createGame(msg.seed, msg.mode, msg.startMana, 'a', msg.mapId));
       setRematchAsked(false);
       setRoute({ s: 'battle' });
     } else if (msg.type === 'action') {
@@ -66,9 +71,10 @@ export default function App() {
       if (isHostRef.current) {
         // guest asked for a rematch — host deals the next battle
         const m = modeRef.current;
+        const mp = mapRef.current;
         const seed = (Math.random() * 0x7fffffff) | 0;
-        netRef.current?.send({ type: 'start', seed, mode: m, startMana: startManaFor(m) });
-        startLocal(seed, m);
+        netRef.current?.send({ type: 'start', seed, mode: m, startMana: startManaFor(m), mapId: mp });
+        startLocal(seed, m, mp);
       } else {
         setRematchAsked(true);
       }
@@ -153,11 +159,13 @@ export default function App() {
         code={code ?? ''}
         mode={mode}
         onMode={setMode}
+        mapId={mapId}
+        onMap={setMapId}
         onBack={toTitle}
         onStart={() => {
           const seed = (Math.random() * 0x7fffffff) | 0;
-          netRef.current?.send({ type: 'start', seed, mode, startMana: startManaFor(mode) });
-          startLocal(seed, mode);
+          netRef.current?.send({ type: 'start', seed, mode, startMana: startManaFor(mode), mapId });
+          startLocal(seed, mode, mapId);
         }}
       />
     );
@@ -175,11 +183,11 @@ export default function App() {
           onMenu={toTitle}
           onRematch={() => {
             if (hotseat) {
-              startLocal((Math.random() * 0x7fffffff) | 0, mode);
+              startLocal((Math.random() * 0x7fffffff) | 0, mode, mapId);
             } else if (isHost) {
               const seed = (Math.random() * 0x7fffffff) | 0;
-              netRef.current?.send({ type: 'start', seed, mode, startMana: startManaFor(mode) });
-              startLocal(seed, mode);
+              netRef.current?.send({ type: 'start', seed, mode, startMana: startManaFor(mode), mapId });
+              startLocal(seed, mode, mapId);
             } else {
               netRef.current?.send({ type: 'rematch' });
               setRematchAsked(true);

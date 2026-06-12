@@ -12,9 +12,10 @@
 
 import Peer, { type DataConnection } from 'peerjs';
 import type { GameAction, GameMode } from './game/engine';
+import type { MapId } from './game/maps';
 
 export type NetMessage =
-  | { type: 'start'; seed: number; mode: GameMode; startMana: number }
+  | { type: 'start'; seed: number; mode: GameMode; startMana: number; mapId: MapId }
   | { type: 'action'; action: GameAction }
   | { type: 'rematch' };
 
