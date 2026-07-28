@@ -189,6 +189,11 @@ html, body { margin: 0; padding: 0; }
 @keyframes pulseSel { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
 
 .path-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; overflow: visible; }
+
+/* impassable cliff edges (elevation difference > 1 grade), both skins */
+.cliff-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; overflow: visible; }
+.cliff-svg line { stroke: rgba(59,44,30,.5); stroke-width: 2.6; stroke-linecap: round; }
+.skin-pix .cliff-svg line { stroke: rgba(40,30,20,.72); stroke-width: 3; stroke-linecap: butt; }
 .path-glow { fill: none; stroke: rgba(67,108,152,.35); stroke-width: 9; stroke-linecap: round; stroke-linejoin: round; }
 .path-core { fill: none; stroke: var(--c-fa); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 7 7; animation: dashflow 1s linear infinite; }
 .path-arrow { fill: var(--c-fa); }
@@ -482,8 +487,11 @@ html, body { margin: 0; padding: 0; }
 .skin-pix .wc-tok-ic { width: 100%; height: 100%; }
 .skin-pix .wc-tok .pix-ic { filter: drop-shadow(0 2px 1px rgba(0,0,0,.35)); }
 .skin-pix .wc-hp { border-radius: 0; }
-/* mirrored bridge / ramp tiles (the art spans NW-SE; flipped = NE-SW) */
+/* mirrored bridge / ramp tiles: the base art spans NW-SE (bridges) or
+   ascends NW (ramps); mirrors point it along the actual crossing */
 .skin-pix .thex.flip { transform: scaleX(-1); }
+.skin-pix .thex.flip-y { transform: scaleY(-1); }
+.skin-pix .thex.flip-xy { transform: scale(-1, -1); }
 /* card portrait & summon chips: no box behind the figure, art fills the slot */
 .skin-pix .wc-portrait { border: none; background: none; border-radius: 0; }
 .skin-pix .wc-portrait::before { content: none; }

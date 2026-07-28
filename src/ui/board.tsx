@@ -173,36 +173,51 @@ export interface Tip {
 const TEX_FOR: Partial<Record<string, string>> = { forest: 'rainforest' };
 
 /**
- * The pix bridge/ramp art spans the NW↔SE diagonal of a pointy-top hex.
- * When the actual crossing runs NE↔SW, mirror the tile. Axes are scored by
- * what the tile connects: land ends for a bridge, a high end and a low
- * passable end for a ramp. E-W spans have no exact art; the base diagonal
- * is used for those.
+ * Orientation of the pix bridge / ramp art for a pointy-top hex.
+ *
+ * Bridges: the plank band should run along the crossing. Each of the three
+ * axes is scored by its ends — an adjacent bridge/ramp (a chain) counts
+ * double, other passable land counts once. E-W crossings use the dedicated
+ * 'bridge-ew' tile; NE-SW mirrors the NW-SE art.
+ *
+ * Ramps: the staircase art ascends toward NW ('ramp') or W ('ramp-ew');
+ * mirror transforms point it at the actual high-ground neighbor.
  */
-function spanFlipped(map: MapDef, q: number, r: number, t: Terrain): boolean {
-  // screen axes for pointy-top axial coords: [E,W], [NE,SW], [NW,SE]
-  const AXES: Array<[[number, number], [number, number]]> = [
-    [[1, 0], [-1, 0]],
-    [[1, -1], [-1, 1]],
-    [[0, -1], [0, 1]],
+function pixVariant(map: MapDef, q: number, r: number, t: Terrain): { suffix: string; cls: string } {
+  const at = (dq: number, dr: number): Terrain | undefined => map.terrain.get((q + dq) + ',' + (r + dr));
+  if (t === 'bridge') {
+    const end = (dq: number, dr: number): number => {
+      const nt = at(dq, dr);
+      if (!nt || nt === 'water' || !PASSABLE[nt]) return 0;
+      return nt === 'bridge' || nt === 'ramp' ? 2 : 1;
+    };
+    // tie-break order: E-W (dedicated art), NW-SE (base art), NE-SW (mirror)
+    const axes: Array<[{ suffix: string; cls: string }, number]> = [
+      [{ suffix: '-ew', cls: '' }, end(1, 0) + end(-1, 0)],
+      [{ suffix: '', cls: '' }, end(0, -1) + end(0, 1)],
+      [{ suffix: '', cls: ' flip' }, end(1, -1) + end(-1, 1)],
+    ];
+    let best = axes[1][0], bestScore = -1;
+    for (const [v, score] of axes) if (score > bestScore) { best = v; bestScore = score; }
+    return best;
+  }
+  // ramp: find the high side it serves — a grade-3 neighbor whose opposite
+  // side is passable low ground scores best; diagonals first (exact art)
+  const DIRS6: Array<[number, number, { suffix: string; cls: string }]> = [
+    [0, -1, { suffix: '', cls: '' }],           // NW — base art ascends this way
+    [1, -1, { suffix: '', cls: ' flip' }],      // NE
+    [-1, 1, { suffix: '', cls: ' flip-y' }],    // SW
+    [0, 1, { suffix: '', cls: ' flip-xy' }],    // SE
+    [-1, 0, { suffix: '-ew', cls: '' }],        // W — dedicated art
+    [1, 0, { suffix: '-ew', cls: ' flip' }],    // E
   ];
-  const endOk = (nq: number, nr: number, wantHigh: boolean): boolean => {
-    const nt = map.terrain.get(nq + ',' + nr);
-    if (!nt) return false;
-    if (t === 'bridge') return nt !== 'water' && PASSABLE[nt];
-    return wantHigh ? GRADE[nt] === 3 : GRADE[nt] <= 2 && PASSABLE[nt];
-  };
-  let best = 2; // default: the art's own NW-SE axis
-  let bestScore = -1;
-  AXES.forEach(([d1, d2], i) => {
-    const score =
-      Math.max(
-        (endOk(q + d1[0], r + d1[1], true) ? 1 : 0) + (endOk(q + d2[0], r + d2[1], false) ? 1 : 0),
-        (endOk(q + d1[0], r + d1[1], false) ? 1 : 0) + (endOk(q + d2[0], r + d2[1], true) ? 1 : 0),
-      );
-    if (score > bestScore) { bestScore = score; best = i; }
-  });
-  return best === 1; // NE-SW: mirror the NW-SE art
+  let best = DIRS6[0][2], bestScore = -1;
+  for (const [dq, dr, v] of DIRS6) {
+    const hi = at(dq, dr), lo = at(-dq, -dr);
+    const score = (hi && GRADE[hi] === 3 ? 2 : 0) + (lo && PASSABLE[lo] && GRADE[lo] <= 2 ? 1 : 0);
+    if (score > bestScore) { bestScore = score; best = v; }
+  }
+  return best;
 }
 
 interface BoardProps {
@@ -229,6 +244,33 @@ export function Board({ map, units = [], sources = [], battleMode, overlay, tip,
     for (const f of ['a', 'b'] as const) for (const p of map.portals[f]) m.set(p.q + ',' + p.r, f);
     return m;
   }, [map]);
+
+  // cliff ridges: adjacent tiles more than one elevation grade apart are
+  // impassable for movement and melee — mark those edges in both skins so
+  // players can plan routes at a glance
+  const cliffs = useMemo(() => {
+    const tOf = (q: number, r: number): ReturnType<typeof map.terrain.get> => {
+      const t = map.terrain.get(q + ',' + r);
+      return t === 'source' && battleMode ? 'grass' : t;
+    };
+    const segs: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
+    const HALF: Array<[number, number]> = [[1, 0], [0, 1], [1, -1]]; // each pair once
+    for (const h of hexes) {
+      const t = tOf(h.q, h.r)!;
+      for (const [dq, dr] of HALF) {
+        const nt = tOf(h.q + dq, h.r + dr);
+        if (!nt || Math.abs(GRADE[t] - GRADE[nt]) <= 1) continue;
+        const c = geom.px(h.q, h.r), n = geom.px(h.q + dq, h.r + dr);
+        const ang = Math.atan2(n.y - c.y, n.x - c.x);
+        const rr = map.hexSize * 0.97;
+        segs.push({
+          x1: c.x + rr * Math.cos(ang - Math.PI / 6), y1: c.y + rr * Math.sin(ang - Math.PI / 6),
+          x2: c.x + rr * Math.cos(ang + Math.PI / 6), y2: c.y + rr * Math.sin(ang + Math.PI / 6),
+        });
+      }
+    }
+    return segs;
+  }, [map, hexes, battleMode, geom]);
 
   const interactive = !!onCell;
   const [view, setView] = useState<View>(() => fitView(geom));
@@ -311,16 +353,19 @@ export function Board({ map, units = [], sources = [], battleMode, overlay, tip,
         <div className="isle-shadow" style={{ left: hexW / 2, top: hexH, right: hexW / 2, bottom: hexH / 2 }}></div>
         {hexes.map((h) => {
           const t = h.t === 'source' && battleMode ? 'grass' : h.t;
-          const tex = TEX_FOR[t] ?? t;
+          let tex = TEX_FOR[t] ?? t;
           const pf = t === 'portal' ? portalOwner.get(h.q + ',' + h.r) : null;
-          const flip =
-            skin === 'pix' && map.orient === 'pointy' && (t === 'bridge' || t === 'ramp') &&
-            spanFlipped(map, h.q, h.r, t);
+          let vcls = '';
+          if (skin === 'pix' && map.orient === 'pointy' && (t === 'bridge' || t === 'ramp')) {
+            const v = pixVariant(map, h.q, h.r, t);
+            tex += v.suffix;
+            vcls = v.cls;
+          }
           const { x, y } = geom.px(h.q, h.r);
           return (
             <div
               key={h.q + ',' + h.r}
-              className={'thex e' + ZLAYER[t] + ' t-' + t + (pf ? ' p' + pf : '') + (flip ? ' flip' : '')}
+              className={'thex e' + ZLAYER[t] + ' t-' + t + (pf ? ' p' + pf : '') + vcls}
               style={{
                 left: x - hexW / 2,
                 top: y - hexH / 2,
@@ -331,6 +376,19 @@ export function Board({ map, units = [], sources = [], battleMode, overlay, tip,
             ></div>
           );
         })}
+        {cliffs.length > 0 && (
+          <svg
+            className="cliff-svg"
+            width={geom.boardW}
+            height={geom.boardH}
+            viewBox={`0 0 ${geom.boardW} ${geom.boardH}`}
+            preserveAspectRatio="none"
+          >
+            {cliffs.map((s, i) => (
+              <line key={i} x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} />
+            ))}
+          </svg>
+        )}
         {sources.map((s) =>
           s.owner ? (
             (() => {

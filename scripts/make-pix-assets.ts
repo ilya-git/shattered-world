@@ -1,20 +1,24 @@
 // Regenerates every asset of the "pix" skin (run with tsx; no image deps):
 //
-//   art/hexloom/*.bmp  →  public/pix/tex/*.png
-//     57x67 Hex Loom tiles: colors softened (desaturated + lifted) for
-//     contrast with the unit sprites, a soft-but-visible gradient border
-//     baked along the hex edge, then upscaled x4 nearest-neighbor.
+//   drawn here  →  public/pix/tex/*.png
+//     57x67 hex tiles drawn procedurally in the HoMM2/3 spirit: flat
+//     muted base colors with light mottling and one sparse motif each
+//     (peak, trees, waves, steps …) so the terrain reads at a glance and
+//     stays quieter than the unit sprites. Summoning portals and mana
+//     sources are the deliberate exceptions — brighter, glowing, meant
+//     to stand out. A soft gradient border is baked along the hex edge;
+//     everything is upscaled x4 nearest-neighbor.
 //
-//   drawn here         →  public/pix/units/<unit>-<faction>.png
+//   drawn here  →  public/pix/units/<unit>-<faction>.png
 //     24x24 full-figure sprites in the Warlords / HoMM2 spirit, auto
 //     black outline, upscaled x4. Faction elements (tabards, shields,
 //     plumes, sashes) use placeholder colors swapped per faction; the
 //     'b' (Crimson) variant is also mirrored so armies face each other.
 //
-//   drawn here         →  public/pix/ui/panel.png (parchment tile)
+//   drawn here  →  public/pix/ui/panel.png (parchment tile)
 
 import { deflateSync } from 'node:zlib';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -68,28 +72,9 @@ function upscale(rgba: Uint8Array, w: number, h: number, k: number): Uint8Array 
   return out;
 }
 
-/* ================= terrain tiles ================= */
+/* ================= terrain tiles (drawn, HoMM2/3-inspired) ================= */
 
-function decodeBmp24(buf: Buffer): { w: number; h: number; rgba: Uint8Array } {
-  const off = buf.readUInt32LE(10);
-  const w = buf.readInt32LE(18);
-  const h = buf.readInt32LE(22);
-  const bpp = buf.readUInt16LE(28);
-  if (bpp !== 24 || h <= 0) throw new Error(`unsupported BMP (bpp=${bpp}, h=${h})`);
-  const stride = Math.ceil((w * 3) / 4) * 4;
-  const rgba = new Uint8Array(w * h * 4);
-  for (let y = 0; y < h; y++) {
-    const src = off + (h - 1 - y) * stride;
-    for (let x = 0; x < w; x++) {
-      const i = (y * w + x) * 4;
-      rgba[i] = buf[src + x * 3 + 2];
-      rgba[i + 1] = buf[src + x * 3 + 1];
-      rgba[i + 2] = buf[src + x * 3];
-      rgba[i + 3] = 255;
-    }
-  }
-  return { w, h, rgba };
-}
+const TW = 57, TH = 67;
 
 /** distance (px, approx) from a point to the edge of the pointy-top hex inscribed in w x h */
 function hexEdgeDist(px: number, py: number, w: number, h: number): number {
@@ -102,37 +87,254 @@ function hexEdgeDist(px: number, py: number, w: number, h: number): number {
   return Math.min(dRight, dSlant);
 }
 
-const TILES = ['grass', 'water', 'sand', 'rainforest', 'mountain', 'desert', 'ramp', 'bridge', 'portal', 'source'];
+type RGB = [number, number, number];
+
+/** hex-masked painter with a deterministic RNG per tile */
+class TilePainter {
+  buf: Float64Array;
+  private seed: number;
+  constructor(base: RGB, seed: number) {
+    this.seed = seed;
+    this.buf = new Float64Array(TW * TH * 3);
+    for (let y = 0; y < TH; y++) for (let x = 0; x < TW; x++) this.force(x, y, base);
+  }
+  rnd(): number {
+    this.seed = (this.seed * 1103515245 + 12345) & 0x7fffffff;
+    return this.seed / 0x7fffffff;
+  }
+  inside(x: number, y: number): boolean { return hexEdgeDist(x, y, TW, TH) >= 0; }
+  private force(x: number, y: number, c: RGB): void {
+    const i = (y * TW + x) * 3;
+    this.buf[i] = c[0]; this.buf[i + 1] = c[1]; this.buf[i + 2] = c[2];
+  }
+  set(x: number, y: number, c: RGB): void {
+    x = Math.round(x); y = Math.round(y);
+    if (x >= 0 && x < TW && y >= 0 && y < TH && this.inside(x, y)) this.force(x, y, c);
+  }
+  blob(cx: number, cy: number, r: number, c: RGB): void {
+    for (let y = Math.floor(cy - r); y <= cy + r; y++)
+      for (let x = Math.floor(cx - r); x <= cx + r; x++)
+        if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) this.set(x, y, c);
+  }
+  /** sparse soft mottling: n blobs of radius 2-4 in the given shades */
+  mottle(n: number, shades: RGB[]): void {
+    for (let i = 0; i < n; i++) {
+      this.blob(3 + this.rnd() * (TW - 6), 3 + this.rnd() * (TH - 6), 2 + this.rnd() * 2, shades[i % shades.length]);
+    }
+  }
+  hseg(x: number, y: number, len: number, c: RGB): void {
+    for (let i = 0; i < len; i++) this.set(x + i, y, c);
+  }
+  /** blend every pixel within r of (cx,cy) toward c, fading with distance */
+  glow(cx: number, cy: number, r: number, c: RGB, strength: number): void {
+    for (let y = 0; y < TH; y++) {
+      for (let x = 0; x < TW; x++) {
+        const d = Math.hypot(x - cx, y - cy);
+        if (d > r || !this.inside(x, y)) continue;
+        const t = strength * (1 - d / r);
+        const i = (y * TW + x) * 3;
+        this.buf[i] += (c[0] - this.buf[i]) * t;
+        this.buf[i + 1] += (c[1] - this.buf[i + 1]) * t;
+        this.buf[i + 2] += (c[2] - this.buf[i + 2]) * t;
+      }
+    }
+  }
+  /** filled triangle (for peaks) */
+  tri(ax: number, ay: number, bx: number, by: number, cx: number, cy: number, c: RGB): void {
+    const minX = Math.floor(Math.min(ax, bx, cx)), maxX = Math.ceil(Math.max(ax, bx, cx));
+    const minY = Math.floor(Math.min(ay, by, cy)), maxY = Math.ceil(Math.max(ay, by, cy));
+    const sign = (x1: number, y1: number, x2: number, y2: number, x3: number, y3: number) =>
+      (x1 - x3) * (y2 - y3) - (x2 - x3) * (y1 - y3);
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        const d1 = sign(x, y, ax, ay, bx, by), d2 = sign(x, y, bx, by, cx, cy), d3 = sign(x, y, cx, cy, ax, ay);
+        if (!((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0))) this.set(x, y, c);
+      }
+    }
+  }
+}
+
+/* muted terrain shades — deliberately dimmer than the unit sprites */
+const T = {
+  grass: { base: [113, 148, 90] as RGB, lo: [101, 134, 80] as RGB, hi: [124, 159, 100] as RGB, tuft: [88, 119, 70] as RGB },
+  water: { base: [88, 118, 148] as RGB, lo: [74, 102, 132] as RGB, hi: [110, 140, 168] as RGB },
+  sand: { base: [204, 181, 132] as RGB, lo: [189, 166, 117] as RGB, hi: [215, 193, 146] as RGB },
+  wood: { mid: [148, 111, 68] as RGB, lo: [110, 78, 44] as RGB, hi: [170, 133, 88] as RGB },
+  rock: { base: [143, 135, 123] as RGB, lo: [113, 105, 94] as RGB, hi: [166, 158, 146] as RGB, snow: [220, 220, 216] as RGB },
+  des: { base: [193, 157, 110] as RGB, lo: [163, 125, 82] as RGB, hi: [209, 176, 130] as RGB, shadow: [140, 104, 66] as RGB },
+};
+
+/** plank band across the tile along the unit direction (ux,uy) */
+function bridgeArt(ux: number, uy: number): TilePainter {
+  const p = TILE_PAINTERS.water();
+  const cx = (TW - 1) / 2, cy = (TH - 1) / 2;
+  for (let y = 0; y < TH; y++) {
+    for (let x = 0; x < TW; x++) {
+      const rx = x - cx, ry = y - cy;
+      const along = rx * ux + ry * uy;
+      const across = Math.abs(rx * -uy + ry * ux);
+      if (across > 9) continue;
+      if (across > 7.6) { p.set(x, y, T.wood.lo); continue; }
+      const plank = Math.floor((along + 100) / 7) % 2 === 0;
+      p.set(x, y, Math.abs((along + 100) % 7) < 1 ? T.wood.lo : plank ? T.wood.mid : T.wood.hi);
+    }
+  }
+  return p;
+}
+
+/**
+ * A stair channel cut through rock, ascending toward the -u end: steps get
+ * brighter as they climb and end on a light summit landing, so the change
+ * of elevation reads directly from the tile.
+ */
+function rampArt(ux: number, uy: number, seed: number): TilePainter {
+  const p = new TilePainter(T.rock.base, seed);
+  p.mottle(12, [T.rock.hi, T.rock.lo]);
+  const cx = (TW - 1) / 2, cy = (TH - 1) / 2;
+  const lerp = (a: RGB, b: RGB, t: number): RGB => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  const lo: RGB = [126, 116, 100], hi: RGB = [196, 189, 176];
+  for (let y = 0; y < TH; y++) {
+    for (let x = 0; x < TW; x++) {
+      const rx = x - cx, ry = y - cy;
+      const along = rx * ux + ry * uy;             // negative = uphill
+      const across = Math.abs(rx * -uy + ry * ux);
+      if (across > 11) continue;
+      if (across > 9) { p.set(x, y, [98, 90, 78]); continue; }   // channel walls
+      if (along < -21) { p.set(x, y, T.rock.snow); continue; }   // summit landing
+      const t = Math.max(0, Math.min(1, (24 - along) / 48));
+      const sep = ((along + 96) % 7) < 1.2;
+      p.set(x, y, sep ? lerp([92, 84, 72], [150, 142, 128], t) : lerp(lo, hi, t));
+    }
+  }
+  return p;
+}
+
+const TILE_PAINTERS: Record<string, () => TilePainter> = {
+  grass: () => {
+    const p = new TilePainter(T.grass.base, 11);
+    p.mottle(26, [T.grass.hi, T.grass.lo]);
+    for (let i = 0; i < 9; i++) {
+      const x = 6 + p.rnd() * (TW - 12), y = 8 + p.rnd() * (TH - 16);
+      p.set(x, y, T.grass.tuft); p.set(x - 1, y + 1, T.grass.tuft); p.set(x + 1, y + 1, T.grass.tuft);
+    }
+    return p;
+  },
+  water: () => {
+    const p = new TilePainter(T.water.base, 22);
+    p.mottle(10, [T.water.lo]);
+    for (let i = 0; i < 9; i++) {
+      const y = 6 + Math.floor(p.rnd() * (TH - 12));
+      p.hseg(5 + p.rnd() * 30, y, 6 + p.rnd() * 9, i % 3 === 2 ? T.water.lo : T.water.hi);
+    }
+    return p;
+  },
+  sand: () => {
+    const p = new TilePainter(T.sand.base, 33);
+    p.mottle(20, [T.sand.hi, T.sand.lo]);
+    for (let i = 0; i < 5; i++) p.hseg(8 + p.rnd() * 28, 10 + p.rnd() * 46, 5 + p.rnd() * 6, T.sand.lo);
+    return p;
+  },
+  rainforest: () => {
+    const p = new TilePainter([104, 138, 84], 44);
+    p.mottle(14, [T.grass.lo]);
+    const canopy: RGB = [64, 100, 58], canopyHi: RGB = [82, 122, 70], trunk: RGB = [102, 72, 44];
+    const spots: Array<[number, number, number]> = [[20, 20, 6], [37, 27, 5], [24, 41, 6], [38, 48, 5], [15, 55, 4]];
+    for (const [cx, cy, r] of spots) {
+      p.set(cx, cy + r + 1, trunk); p.set(cx, cy + r + 2, trunk);
+      p.blob(cx, cy, r, canopy);
+      p.blob(cx - r * 0.35, cy - r * 0.35, r * 0.45, canopyHi);
+    }
+    return p;
+  },
+  mountain: () => {
+    const p = new TilePainter(T.rock.base, 55);
+    p.mottle(14, [T.rock.hi, T.rock.lo]);
+    // one big peak: lit west face, shaded east face, small snow cap
+    p.tri(28, 12, 10, 50, 28, 50, T.rock.hi);
+    p.tri(28, 12, 28, 50, 46, 50, T.rock.lo);
+    p.tri(28, 12, 24, 21, 32, 21, T.rock.snow);
+    // foothill
+    p.tri(42, 34, 34, 52, 50, 52, T.rock.lo);
+    return p;
+  },
+  desert: () => {
+    const p = new TilePainter(T.des.base, 66);
+    p.mottle(16, [T.des.hi, T.des.lo]);
+    // mesa: stacked slabs with a shaded side
+    p.tri(28, 16, 12, 48, 28, 48, T.des.hi);
+    p.tri(28, 16, 28, 48, 44, 48, T.des.lo);
+    p.tri(28, 34, 22, 48, 34, 48, T.des.shadow);
+    return p;
+  },
+  ramp: () => rampArt(0.55, 0.835, 77),   // staircase ascending toward NW
+  'ramp-ew': () => rampArt(1, 0, 78),     // … toward W
+  bridge: () => bridgeArt(0.55, 0.835),   // planks along the NW-SE crossing
+  'bridge-ew': () => bridgeArt(1, 0),     // … along the E-W crossing
+  portal: () => {
+    // dark arcane stone — deliberately moodier than every terrain around it
+    const p = new TilePainter([84, 76, 96], 88);
+    p.mottle(12, [[74, 66, 86], [95, 87, 108]]);
+    const cx = 28, cy = 33;
+    p.glow(cx, cy, 24, [140, 110, 190], 0.35);
+    // the summoning ring itself: bright violet, gently lit inner void
+    for (let a = 0; a < 360; a += 2) {
+      const x = cx + 15 * Math.cos((a * Math.PI) / 180);
+      const y = cy + 13 * Math.sin((a * Math.PI) / 180);
+      p.set(x, y, [206, 168, 255]);
+      p.set(x + 0.7, y, [178, 138, 232]);
+    }
+    p.glow(cx, cy, 11, [60, 48, 80], 0.55);
+    // rune sparks on the ring
+    for (const a of [15, 75, 135, 195, 255, 315]) {
+      const x = cx + 15 * Math.cos((a * Math.PI) / 180);
+      const y = cy + 13 * Math.sin((a * Math.PI) / 180);
+      p.set(x, y, [240, 224, 255]);
+    }
+    return p;
+  },
+  source: () => {
+    // lavender ground with a bright mana crystal cluster
+    const p = new TilePainter([124, 114, 138], 99);
+    p.mottle(12, [[112, 102, 126], [136, 126, 150]]);
+    const cx = 28, cy = 34;
+    p.glow(cx, cy, 22, [150, 190, 230], 0.4);
+    const crystal = (x: number, ytop: number, hw: number, hh: number, main: RGB, edge: RGB) => {
+      p.tri(x, ytop, x - hw, ytop + hh, x, ytop + hh * 1.6, main);
+      p.tri(x, ytop, x + hw, ytop + hh, x, ytop + hh * 1.6, edge);
+      p.set(x, ytop + 1, [244, 252, 255]);
+    };
+    crystal(28, 16, 5, 12, [168, 226, 240], [104, 170, 200]);
+    crystal(19, 26, 4, 8, [160, 130, 224], [112, 84, 176]);
+    crystal(37, 28, 4, 7, [150, 208, 232], [96, 150, 190]);
+    return p;
+  },
+};
 
 function makeTiles(): void {
   const outDir = join(ROOT, 'public/pix/tex');
   mkdirSync(outDir, { recursive: true });
-  for (const name of TILES) {
-    const { w, h, rgba } = decodeBmp24(readFileSync(join(ROOT, 'art/hexloom', name + '.bmp')));
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const i = (y * w + x) * 4;
-        let [r, g, b] = [rgba[i], rgba[i + 1], rgba[i + 2]];
-        // soften: pull toward luminance and lift — landing between the raw
-        // Hex Loom colors and the watercolor pastels, so sprites pop on top
-        const L = 0.299 * r + 0.587 * g + 0.114 * b;
-        r += (L - r) * 0.45 + 18;
-        g += (L - g) * 0.45 + 18;
-        b += (L - b) * 0.45 + 15;
-        // gradient border: 3px deep fade to ~68% at the very edge —
-        // softer than a hard line, but clearly visible between tiles
-        const d = hexEdgeDist(x, y, w, h);
+  for (const [name, paint] of Object.entries(TILE_PAINTERS)) {
+    const p = paint();
+    const rgba = new Uint8Array(TW * TH * 4);
+    for (let y = 0; y < TH; y++) {
+      for (let x = 0; x < TW; x++) {
+        const i = (y * TW + x) * 3;
+        let [r, g, b] = [p.buf[i], p.buf[i + 1], p.buf[i + 2]];
+        // gradient border: 3px fade at the hex edge — soft but visible
+        const d = hexEdgeDist(x, y, TW, TH);
         if (d >= 0 && d < 3) {
           const t = (3 - d) / 3;
-          const f = 1 - 0.32 * Math.pow(t, 1.5);
+          const f = 1 - 0.30 * Math.pow(t, 1.5);
           r *= f; g *= f; b *= f;
         }
-        rgba[i] = Math.max(0, Math.min(255, r));
-        rgba[i + 1] = Math.max(0, Math.min(255, g));
-        rgba[i + 2] = Math.max(0, Math.min(255, b));
+        const o = (y * TW + x) * 4;
+        rgba[o] = Math.max(0, Math.min(255, r));
+        rgba[o + 1] = Math.max(0, Math.min(255, g));
+        rgba[o + 2] = Math.max(0, Math.min(255, b));
+        rgba[o + 3] = 255;
       }
     }
-    writeFileSync(join(outDir, name + '.png'), pngEncode(w * 4, h * 4, upscale(rgba, w, h, 4)));
+    writeFileSync(join(outDir, name + '.png'), pngEncode(TW * 4, TH * 4, upscale(rgba, TW, TH, 4)));
     console.log(`tex/${name}.png`);
   }
 }
