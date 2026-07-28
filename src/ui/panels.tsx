@@ -4,7 +4,8 @@
 
 import type { CSSProperties, ReactNode } from 'react';
 import { STATS, UNIT_ORDER, type Faction, type UnitType } from '../game/data';
-import { Icon } from './icons';
+import { UnitPic } from './icons';
+import { setSkin, useSkin } from './skin';
 
 export const PARCH: CSSProperties = {
   '--wc-paper': '#f1ebdd',
@@ -24,12 +25,31 @@ export const PARCH: CSSProperties = {
 } as CSSProperties;
 
 export function Screen({ children, className, label }: { children: ReactNode; className?: string; label?: string }) {
+  const skin = useSkin();
+  const style = {
+    ...PARCH,
+    '--pix-panel': `url(${import.meta.env.BASE_URL}pix/ui/panel.png)`,
+  } as CSSProperties;
   return (
-    <div className={'wc ' + (className || '')} style={PARCH} data-screen-label={label}>
+    <div className={'wc skin-' + skin + ' ' + (className || '')} style={style} data-screen-label={label}>
       <div className="wc-paper"></div>
       <div className="wc-grain"></div>
       {children}
     </div>
+  );
+}
+
+/** The visuals switch: watercolor wash ⇄ pixel art. Position via className. */
+export function SkinToggle({ className }: { className?: string }) {
+  const skin = useSkin();
+  return (
+    <button
+      className={'skin-toggle ' + (className || '')}
+      title="Switch between the watercolor and pixel-art looks"
+      onClick={() => setSkin(skin === 'wash' ? 'pix' : 'wash')}
+    >
+      {skin === 'wash' ? '▦ visuals: watercolor' : '▦ visuals: pixel'}
+    </button>
   );
 }
 
@@ -94,7 +114,7 @@ export function UnitCard({ unit, actions }: { unit: CardUnit; actions?: CardActi
           style={{ '--tok-c': unit.faction === 'b' ? 'var(--c-fb)' : 'var(--c-fa)' } as CSSProperties}
         >
           <span className="wc-portrait-ic">
-            <Icon type={unit.type} />
+            <UnitPic type={unit.type} />
           </span>
         </div>
         <div>
@@ -182,7 +202,7 @@ export function SummonDock({ mana, onPick, activeType, disabledAll, dim, note }:
             title={STATS[t].special}
           >
             <span className="wc-su-ic" style={{ '--tok-c': 'var(--c-fa)' } as CSSProperties}>
-              <Icon type={t} />
+              <UnitPic type={t} />
             </span>
             <span className="wc-su-n">{STATS[t].name}</span>
             <span className="wc-su-c">✦{STATS[t].cost}</span>

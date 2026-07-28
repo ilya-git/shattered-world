@@ -431,3 +431,63 @@ html, body { margin: 0; padding: 0; }
 .log-entry { display: flex; gap: 8px; align-items: baseline; font-size: 12.5px; line-height: 1.35; }
 .log-entry .wc-dot { width: 8px; height: 8px; flex: 0 0 auto; transform: translateY(.5px); }
 .log-entry.turn { opacity: .65; font-style: italic; border-bottom: 1px dotted var(--wc-ink-soft); padding-bottom: 5px; }
+/* ================= visual skins ================= */
+
+/* the toggle button (base look: quiet parchment chip like .log-btn) */
+.skin-toggle { border: 1.4px solid var(--wc-ink-soft); background: transparent; color: var(--wc-ink);
+  font-family: inherit; font-size: 12.5px; font-style: italic; padding: 5px 12px; border-radius: 3px;
+  cursor: pointer; opacity: .75; }
+.skin-toggle:hover { opacity: 1; background: var(--wc-paper); }
+.title-foot .skin-toggle { pointer-events: auto; font-size: 12px; padding: 3px 10px; }
+.skin-btn-battle { position: absolute; z-index: 10; left: 18px; bottom: 56px; }
+
+/* pixel sprite images */
+.pix-ic { display: block; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.wc-su-ic .pix-ic { position: relative; z-index: 1; width: 17px; height: 17px; }
+.mb-ic .pix-ic { width: 22px; height: 22px; }
+
+/* ---- the 'pix' skin: Warlords / HoMM2 retro chrome ---- */
+.skin-pix { font-family: 'VT323', monospace; letter-spacing: 0; }
+.skin-pix .thex { image-rendering: pixelated; }
+.skin-pix .wc-grain { display: none; }
+.skin-pix .isle-shadow { display: none; }
+
+/* panels: parchment tile, hard corners, wood + gold double frame */
+.skin-pix .wc-panel { background: var(--pix-panel) repeat; border: 3px solid #5a3818; border-radius: 0;
+  box-shadow: inset 0 0 0 2px #d9a441, 0 4px 0 rgba(0,0,0,.30); }
+.skin-pix .wc-panel::before { display: none; }
+
+/* buttons go blocky: bevel via inset shadows, no round corners */
+.skin-pix button { border-radius: 0 !important; font-family: 'VT323', monospace; font-style: normal; }
+.skin-pix .wc-act, .skin-pix .menu-btn, .skin-pix .wc-summon, .skin-pix .skin-toggle,
+.skin-pix .resign-btn, .skin-pix .log-btn, .skin-pix .ready-counter {
+  background: #c9b78d; border: 2px solid #5a3818; color: #2c2014;
+  box-shadow: inset 2px 2px 0 rgba(255,255,255,.45), inset -2px -2px 0 rgba(90,56,24,.45); opacity: 1; }
+.skin-pix .wc-act.primary { background: #d9a441; }
+.skin-pix .wc-act:disabled, .skin-pix .wc-summon:disabled { opacity: .45; }
+.skin-pix .endturn-btn { background: #a03020; border: 2px solid #3c1008; color: #ffe8c0;
+  box-shadow: inset 2px 2px 0 rgba(255,255,255,.25), inset -2px -2px 0 rgba(0,0,0,.35); }
+.skin-pix .menu-btn.primary { background: #a03020; color: #ffe8c0; }
+.skin-pix .mb-ic { border-radius: 0; border: 2px solid currentColor; }
+
+/* tokens: square army stands instead of washed discs */
+.skin-pix .wc-tok-body { border-radius: 2px; border-width: 2px; box-shadow: 0 2px 0 rgba(0,0,0,.35); }
+.skin-pix .wc-tok-body::before { opacity: .45; mix-blend-mode: normal; }
+.skin-pix .wc-tok-body::after { display: none; }
+.skin-pix .wc-sel { border-radius: 0; animation: none; }
+.skin-pix .wc-hp { border-radius: 0; }
+.skin-pix .wc-portrait { border-radius: 0; }
+.skin-pix .wc-portrait::before { content: none; }
+.skin-pix .wc-su-ic { border-radius: 0; }
+.skin-pix .wc-su-ic::before { opacity: .3; }
+
+/* headings & text tuned for the bitmap font */
+.skin-pix .wc-wordmark, .skin-pix .title-word { font-family: 'VT323', monospace; font-style: normal; }
+.skin-pix .wc-sp-l, .skin-pix .hint-k { font-family: 'VT323', monospace; font-size: 13px; }
+.skin-pix .hl-num { font-family: 'VT323', monospace; font-size: calc(var(--hex, 64px) * 0.30); font-weight: 400; }
+.skin-pix .title-kicker, .skin-pix .wc-card-sub, .skin-pix .mb-d { font-style: normal; }
+
+/* overlays keep meaning but drop the soft glow */
+.skin-pix .hl.move-hot { box-shadow: inset 0 0 0 3px var(--c-fa); }
+.skin-pix .hl.atk-sel { box-shadow: inset 0 0 0 3px var(--c-fb); }
+.skin-pix .reticle { border-radius: 0; }

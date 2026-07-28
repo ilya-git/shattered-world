@@ -8,7 +8,8 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { hexesOf, type MapDef } from '../game/maps';
 import { ZLAYER, type Faction, type UnitType } from '../game/data';
 import type { SourceState } from '../game/engine';
-import { Icon } from './icons';
+import { Icon, UnitPic } from './icons';
+import { useSkin } from './skin';
 
 export const FRAME_W = 1040;
 export const FRAME_H = 700;
@@ -138,7 +139,7 @@ function Token({ u, geom }: { u: DisplayUnit; geom: BoardGeom }) {
       {u.sel && <div className="wc-sel"></div>}
       <div className="wc-tok-body">
         <span className="wc-tok-ic">
-          <Icon type={u.type} />
+          <UnitPic type={u.type} />
         </span>
       </div>
       {u.spent && <span className="tok-done">✓</span>}
@@ -186,6 +187,8 @@ interface BoardProps {
 
 export function Board({ map, units = [], sources = [], battleMode, overlay, tip, onCell, onCellEnter, onCellLeave, children }: BoardProps) {
   const base = import.meta.env.BASE_URL;
+  const skin = useSkin();
+  const texDir = skin === 'pix' ? 'pix/tex' : 'tex';
   const geom = useMemo(() => geomOf(map), [map]);
   const hexes = useMemo(() => hexesOf(map), [map]);
   const portalOwner = useMemo(() => {
@@ -286,7 +289,7 @@ export function Board({ map, units = [], sources = [], battleMode, overlay, tip,
                 top: y - hexH / 2,
                 width: hexW,
                 height: hexH,
-                backgroundImage: `url(${base}tex/${tex}.png)`,
+                backgroundImage: `url(${base}${texDir}/${tex}.png)`,
               }}
             ></div>
           );

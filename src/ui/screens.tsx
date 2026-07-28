@@ -3,8 +3,8 @@
 
 import { useState, type ReactNode } from 'react';
 import { Board, type DisplayUnit } from './board';
-import { Screen, Die } from './panels';
-import { Icon } from './icons';
+import { Screen, Die, SkinToggle } from './panels';
+import { Icon, UnitPic } from './icons';
 import type { Faction, UnitType } from '../game/data';
 import { mapOf, type FactionStats, type GameMode, type GameState } from '../game/engine';
 import { MAPS, MAP_LIST, type MapId } from '../game/maps';
@@ -45,7 +45,7 @@ export function HeroMap({ mapId = 'isle' as MapId }: { mapId?: MapId }) {
 function MenuBtn({ icon, title, desc, primary, onClick }: { icon: UnitType; title: string; desc: string; primary?: boolean; onClick?: () => void }) {
   return (
     <button className={'menu-btn' + (primary ? ' primary' : '')} onClick={onClick}>
-      <span className="mb-ic"><Icon type={icon} /></span>
+      <span className="mb-ic"><UnitPic type={icon} /></span>
       <span className="mb-txt">
         <span className="mb-t">{title}</span>
         <span className="mb-d">{desc}</span>
@@ -73,6 +73,7 @@ export function TitleScreen({ onHost, onJoin, onHotseat, onRules }: { onHost: ()
       </div>
       <div className="title-foot">
         <span>v1.0 · the parchment update</span>
+        <SkinToggle />
         <span>control all nine Sources for three turns to win</span>
       </div>
     </Screen>

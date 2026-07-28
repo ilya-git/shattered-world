@@ -1,8 +1,10 @@
 // Unit pictograms from the Claude Design handoff (sw-core.jsx + the
-// planeswalker / translocator glyphs from the styles exploration).
+// planeswalker / translocator glyphs from the styles exploration), plus
+// UnitPic — the skin-aware wrapper that swaps in the pixel-art sprites.
 
 import type { UnitType } from '../game/data';
 import type { ReactElement } from 'react';
+import { useSkin } from './skin';
 
 const ICON: Record<UnitType, ReactElement> = {
   swordsman: (
@@ -77,4 +79,20 @@ export function Icon({ type }: { type: UnitType }) {
       {ICON[type]}
     </svg>
   );
+}
+
+/** Skin-aware unit picture: watercolor pictogram or pixel-art sprite. */
+export function UnitPic({ type }: { type: UnitType }) {
+  const skin = useSkin();
+  if (skin === 'pix') {
+    return (
+      <img
+        className="pix-ic"
+        src={`${import.meta.env.BASE_URL}pix/units/${type}.png`}
+        alt=""
+        draggable={false}
+      />
+    );
+  }
+  return <Icon type={type} />;
 }

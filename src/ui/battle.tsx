@@ -13,7 +13,7 @@ import {
 } from '../game/engine';
 import { hexesOf, type MapDef } from '../game/maps';
 import { Board, type DisplayUnit, type Overlay, type OverlayCell, type Tip } from './board';
-import { CombatPanel, Screen, SummonDock, TopBar, UnitCard, type CardAction } from './panels';
+import { CombatPanel, Screen, SkinToggle, SummonDock, TopBar, UnitCard, type CardAction } from './panels';
 
 type UiMode =
   | 'idle' | 'move' | 'planeswalk' | 'attack' | 'shift'
@@ -635,6 +635,7 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
       <button className={'log-btn' + (showLog ? ' on' : '')} onClick={() => setShowLog((s) => !s)}>
         ☰ Log
       </button>
+      <SkinToggle className="skin-btn-battle" />
 
       {!myTurn && !g.winner && !g.draw && (
         <div className="turn-banner banner-fade" key={turnKey}>
