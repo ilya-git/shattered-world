@@ -114,7 +114,7 @@ export function UnitCard({ unit, actions }: { unit: CardUnit; actions?: CardActi
           style={{ '--tok-c': unit.faction === 'b' ? 'var(--c-fb)' : 'var(--c-fa)' } as CSSProperties}
         >
           <span className="wc-portrait-ic">
-            <UnitPic type={unit.type} />
+            <UnitPic type={unit.type} faction={unit.faction} />
           </span>
         </div>
         <div>
@@ -178,13 +178,14 @@ export function CombatPanel({ a, b, result }: { a: { name: string; die: number; 
   );
 }
 
-export function SummonDock({ mana, onPick, activeType, disabledAll, dim, note }: {
+export function SummonDock({ mana, onPick, activeType, disabledAll, dim, note, faction }: {
   mana: number;
   onPick?: (t: UnitType) => void;
   activeType?: UnitType | null;
   disabledAll?: boolean;
   dim?: boolean;
   note?: string;
+  faction?: Faction;
 }) {
   return (
     <div className={'wc-panel wc-dock' + (dim ? ' dim' : '')}>
@@ -202,7 +203,7 @@ export function SummonDock({ mana, onPick, activeType, disabledAll, dim, note }:
             title={STATS[t].special}
           >
             <span className="wc-su-ic" style={{ '--tok-c': 'var(--c-fa)' } as CSSProperties}>
-              <UnitPic type={t} />
+              <UnitPic type={t} faction={faction} />
             </span>
             <span className="wc-su-n">{STATS[t].name}</span>
             <span className="wc-su-c">✦{STATS[t].cost}</span>

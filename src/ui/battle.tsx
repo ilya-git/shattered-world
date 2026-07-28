@@ -604,6 +604,7 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
       )}
 
       <SummonDock
+        faction={my}
         mana={g.mana[my]}
         activeType={summonType}
         disabledAll={!myTurn || g.actedThisTurn}

@@ -2,7 +2,7 @@
 // planeswalker / translocator glyphs from the styles exploration), plus
 // UnitPic — the skin-aware wrapper that swaps in the pixel-art sprites.
 
-import type { UnitType } from '../game/data';
+import type { Faction, UnitType } from '../game/data';
 import type { ReactElement } from 'react';
 import { useSkin } from './skin';
 
@@ -81,14 +81,18 @@ export function Icon({ type }: { type: UnitType }) {
   );
 }
 
-/** Skin-aware unit picture: watercolor pictogram or pixel-art sprite. */
-export function UnitPic({ type }: { type: UnitType }) {
+/**
+ * Skin-aware unit picture: watercolor pictogram or pixel-art sprite.
+ * Pixel sprites come in per-faction variants (Azure blue faces right,
+ * Crimson red is mirrored to face left, classic-TBS style); default 'a'.
+ */
+export function UnitPic({ type, faction }: { type: UnitType; faction?: Faction }) {
   const skin = useSkin();
   if (skin === 'pix') {
     return (
       <img
         className="pix-ic"
-        src={`${import.meta.env.BASE_URL}pix/units/${type}.png`}
+        src={`${import.meta.env.BASE_URL}pix/units/${type}-${faction ?? 'a'}.png`}
         alt=""
         draggable={false}
       />

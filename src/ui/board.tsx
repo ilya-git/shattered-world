@@ -6,7 +6,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { hexesOf, type MapDef } from '../game/maps';
-import { ZLAYER, type Faction, type UnitType } from '../game/data';
+import { GRADE, PASSABLE, ZLAYER, type Faction, type Terrain, type UnitType } from '../game/data';
 import type { SourceState } from '../game/engine';
 import { Icon, UnitPic } from './icons';
 import { useSkin } from './skin';
@@ -139,7 +139,7 @@ function Token({ u, geom }: { u: DisplayUnit; geom: BoardGeom }) {
       {u.sel && <div className="wc-sel"></div>}
       <div className="wc-tok-body">
         <span className="wc-tok-ic">
-          <UnitPic type={u.type} />
+          <UnitPic type={u.type} faction={u.faction} />
         </span>
       </div>
       {u.spent && <span className="tok-done">✓</span>}
@@ -171,6 +171,39 @@ export interface Tip {
 // every terrain has its own tile in the tex3 set; only the internal
 // 'forest' key differs from the file name
 const TEX_FOR: Partial<Record<string, string>> = { forest: 'rainforest' };
+
+/**
+ * The pix bridge/ramp art spans the NW↔SE diagonal of a pointy-top hex.
+ * When the actual crossing runs NE↔SW, mirror the tile. Axes are scored by
+ * what the tile connects: land ends for a bridge, a high end and a low
+ * passable end for a ramp. E-W spans have no exact art; the base diagonal
+ * is used for those.
+ */
+function spanFlipped(map: MapDef, q: number, r: number, t: Terrain): boolean {
+  // screen axes for pointy-top axial coords: [E,W], [NE,SW], [NW,SE]
+  const AXES: Array<[[number, number], [number, number]]> = [
+    [[1, 0], [-1, 0]],
+    [[1, -1], [-1, 1]],
+    [[0, -1], [0, 1]],
+  ];
+  const endOk = (nq: number, nr: number, wantHigh: boolean): boolean => {
+    const nt = map.terrain.get(nq + ',' + nr);
+    if (!nt) return false;
+    if (t === 'bridge') return nt !== 'water' && PASSABLE[nt];
+    return wantHigh ? GRADE[nt] === 3 : GRADE[nt] <= 2 && PASSABLE[nt];
+  };
+  let best = 2; // default: the art's own NW-SE axis
+  let bestScore = -1;
+  AXES.forEach(([d1, d2], i) => {
+    const score =
+      Math.max(
+        (endOk(q + d1[0], r + d1[1], true) ? 1 : 0) + (endOk(q + d2[0], r + d2[1], false) ? 1 : 0),
+        (endOk(q + d1[0], r + d1[1], false) ? 1 : 0) + (endOk(q + d2[0], r + d2[1], true) ? 1 : 0),
+      );
+    if (score > bestScore) { bestScore = score; best = i; }
+  });
+  return best === 1; // NE-SW: mirror the NW-SE art
+}
 
 interface BoardProps {
   map: MapDef;
@@ -272,6 +305,7 @@ export function Board({ map, units = [], sources = [], battleMode, overlay, tip,
           height: geom.boardH,
           transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.z})`,
           '--hex': hexW + 'px',
+          '--hexh': hexH + 'px',
         } as React.CSSProperties}
       >
         <div className="isle-shadow" style={{ left: hexW / 2, top: hexH, right: hexW / 2, bottom: hexH / 2 }}></div>
@@ -279,11 +313,14 @@ export function Board({ map, units = [], sources = [], battleMode, overlay, tip,
           const t = h.t === 'source' && battleMode ? 'grass' : h.t;
           const tex = TEX_FOR[t] ?? t;
           const pf = t === 'portal' ? portalOwner.get(h.q + ',' + h.r) : null;
+          const flip =
+            skin === 'pix' && map.orient === 'pointy' && (t === 'bridge' || t === 'ramp') &&
+            spanFlipped(map, h.q, h.r, t);
           const { x, y } = geom.px(h.q, h.r);
           return (
             <div
               key={h.q + ',' + h.r}
-              className={'thex e' + ZLAYER[t] + ' t-' + t + (pf ? ' p' + pf : '')}
+              className={'thex e' + ZLAYER[t] + ' t-' + t + (pf ? ' p' + pf : '') + (flip ? ' flip' : '')}
               style={{
                 left: x - hexW / 2,
                 top: y - hexH / 2,
