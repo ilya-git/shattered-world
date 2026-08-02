@@ -7,8 +7,8 @@ import { DIRS, hexDist, keyOf, type Hex } from '../game/hex';
 import { PASSABLE, STATS, halfCost, type Faction, type UnitType } from '../game/data';
 import {
   attackTargets, canSummon, defenderAura, effectiveTerrain, gradeOk, mapOf,
-  planeswalkCells, reachableCells, shiftTargets, summonCells, translocateDests,
-  unitAt, unitCanAct,
+  planeswalkCells, reachableCells, shiftTargets, summonCells, threatCells,
+  translocateDests, unitAt, unitCanAct,
   type GameAction, type GameState, type Unit,
 } from '../game/engine';
 import { hexesOf, type MapDef } from '../game/maps';
@@ -67,6 +67,7 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
   const [combat, setCombat] = useState<GameState['lastCombat']>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [showLog, setShowLog] = useState(false);
+  const [showThreat, setShowThreat] = useState(true);
 
   const sel = selId != null ? g.units.find((u) => u.id === selId) ?? null : null;
 
@@ -352,6 +353,21 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
     return { cells, line, lineCls, arrow, reticle };
   }, [g, map, sel, mode, hover, myTurn, my, summonType, translocId]);
 
+  /* ---------- enemy threat outline ---------- */
+
+  // Union of where every enemy could move-and-strike on its next turn, mana
+  // aside. Kept out of the overlay memo above so hovering a hex doesn't
+  // re-run it — it only depends on the board, not on the pointer.
+  const threat = useMemo(() => {
+    if (!showThreat || !myTurn) return undefined;
+    const seen = new Map<string, Hex>();
+    for (const e of g.units) {
+      if (e.faction === my) continue;
+      for (const c of threatCells(g, e)) seen.set(keyOf(c), c);
+    }
+    return seen.size > 0 ? [...seen.values()] : undefined;
+  }, [g, my, myTurn, showThreat]);
+
   /* ---------- readiness: what can still act this turn ---------- */
 
   const readyIds = useMemo(
@@ -506,7 +522,7 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
         units={units}
         sources={g.sources}
         battleMode={g.mode === 'battle'}
-        overlay={overlay}
+        overlay={{ ...overlay, contour: threat }}
         tip={tip}
         onCell={onCell}
         onCellEnter={(q, r) => setHover({ q, r })}
@@ -635,6 +651,13 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
       <button className="resign-btn" onClick={onResign}>Resign</button>
       <button className={'log-btn' + (showLog ? ' on' : '')} onClick={() => setShowLog((s) => !s)}>
         ☰ Log
+      </button>
+      <button
+        className={'threat-btn' + (showThreat ? ' on' : '')}
+        onClick={() => setShowThreat((s) => !s)}
+        title="Outline where enemy units could move and then strike next turn (mana boosts not counted)"
+      >
+        ⚔ threat {showThreat ? 'shown' : 'hidden'}
       </button>
       <SkinToggle className="skin-btn-battle" />
 

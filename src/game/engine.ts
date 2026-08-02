@@ -319,6 +319,69 @@ export function attackTargets(g: GameState, u: Unit): TargetCell[] {
   return out;
 }
 
+/* ---------- threat projection (advisory; never gates an action) ---------- */
+
+/**
+ * Every hex `u` could strike on its next turn: full movement (Appendix 1
+ * `move`) to any standing hex, then one attack from there.
+ *
+ * Deliberately excludes everything mana can buy — the swordsman's forced
+ * march and the archer's paid reach — so the outline shows what the enemy
+ * threatens for free; a full purse can always reach further. Units whose
+ * attack is "n/a" (Healer, Translocator) threaten nothing, since both of
+ * their offensive options cost mana too.
+ *
+ * The walk ignores unit occupancy: by the time this matters both armies
+ * have moved, so blockers standing there now say little about next turn.
+ * Terrain and the elevation rule (≤1 grade, for both the walk and a melee
+ * blow) are honoured, which is what carves the safe pockets worth seeing.
+ */
+export function threatCells(g: GameState, u: Unit): Hex[] {
+  const s = STATS[u.type];
+  if (s.atk === null) return [];
+  const map = mapOf(g);
+  const walkable = (q: number, r: number): boolean => {
+    const t = effectiveTerrain(g, q, r);
+    return !!t && PASSABLE[t];
+  };
+
+  // standing hexes: the unit's own, plus everything within its move budget
+  const seen = new Map<string, number>([[keyOf(u), 0]]);
+  const stands: Hex[] = [{ q: u.q, r: u.r }];
+  const queue: Array<[number, Hex]> = [[0, { q: u.q, r: u.r }]];
+  while (queue.length) {
+    const [d, c] = queue.shift()!;
+    if (d >= s.move) continue;
+    for (const [dq, dr] of DIRS) {
+      const n = { q: c.q + dq, r: c.r + dr };
+      const k = keyOf(n);
+      if (seen.has(k) || !map.terrain.has(k) || !walkable(n.q, n.r) || !gradeOk(g, c, n)) continue;
+      seen.set(k, d + 1);
+      stands.push(n);
+      queue.push([d + 1, n]);
+    }
+  }
+
+  // …then one attack from each of them
+  const out = new Map<string, Hex>();
+  const R = s.rng;
+  for (const st of stands) {
+    for (let dq = -R; dq <= R; dq++) {
+      for (let dr = Math.max(-R, -dq - R); dr <= Math.min(R, -dq + R); dr++) {
+        if (dq === 0 && dr === 0) continue;
+        const c = { q: st.q + dq, r: st.r + dr };
+        const k = keyOf(c);
+        if (out.has(k) || !map.terrain.has(k)) continue;
+        const d = hexDist(st, c);
+        if (s.minRng && d < s.minRng) continue;
+        if (R === 1 && !gradeOk(g, st, c)) continue;
+        out.set(k, c);
+      }
+    }
+  }
+  return [...out.values()];
+}
+
 /** Neutral or enemy sources adjacent to the unit (shift ignores range). */
 export function shiftTargets(g: GameState, u: Unit): SourceState[] {
   if (STATS[u.type].atk === null || u.attacks <= 0) return [];

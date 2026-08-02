@@ -5,6 +5,7 @@
 // of Amphis, with pan & zoom for boards bigger than the frame.
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { DIRS } from '../game/hex';
 import { hexesOf, type MapDef } from '../game/maps';
 import { GRADE, PASSABLE, ZLAYER, type Faction, type Terrain, type UnitType } from '../game/data';
 import type { SourceState } from '../game/engine';
@@ -77,6 +78,27 @@ export interface Overlay {
   lineCls?: string;
   arrow?: boolean;
   reticle?: { q: number; r: number } | null;
+  /** hexes to trace a perimeter around (enemy threat zone) */
+  contour?: Array<{ q: number; r: number }>;
+}
+
+/**
+ * The edge two adjacent hexes share, as a drawable segment: its endpoints
+ * are the corners at ±30° off the centre-to-centre line, one circumradius
+ * out. `shrink` pulls it in slightly where segments shouldn't overlap.
+ */
+function edgeBetween(
+  geom: BoardGeom, s: number,
+  c: { q: number; r: number }, n: { q: number; r: number },
+  shrink = 1,
+): { x1: number; y1: number; x2: number; y2: number } {
+  const a = geom.px(c.q, c.r), b = geom.px(n.q, n.r);
+  const ang = Math.atan2(b.y - a.y, b.x - a.x);
+  const rr = s * shrink;
+  return {
+    x1: a.x + rr * Math.cos(ang - Math.PI / 6), y1: a.y + rr * Math.sin(ang - Math.PI / 6),
+    x2: a.x + rr * Math.cos(ang + Math.PI / 6), y2: a.y + rr * Math.sin(ang + Math.PI / 6),
+  };
 }
 
 function PathLine({ geom, cells, arrow, cls }: { geom: BoardGeom; cells: Array<{ q: number; r: number }>; arrow?: boolean; cls?: string }) {
@@ -260,17 +282,27 @@ export function Board({ map, units = [], sources = [], battleMode, overlay, tip,
       for (const [dq, dr] of HALF) {
         const nt = tOf(h.q + dq, h.r + dr);
         if (!nt || Math.abs(GRADE[t] - GRADE[nt]) <= 1) continue;
-        const c = geom.px(h.q, h.r), n = geom.px(h.q + dq, h.r + dr);
-        const ang = Math.atan2(n.y - c.y, n.x - c.x);
-        const rr = map.hexSize * 0.97;
-        segs.push({
-          x1: c.x + rr * Math.cos(ang - Math.PI / 6), y1: c.y + rr * Math.sin(ang - Math.PI / 6),
-          x2: c.x + rr * Math.cos(ang + Math.PI / 6), y2: c.y + rr * Math.sin(ang + Math.PI / 6),
-        });
+        segs.push(edgeBetween(geom, map.hexSize, h, { q: h.q + dq, r: h.r + dr }, 0.97));
       }
     }
     return segs;
   }, [map, hexes, battleMode, geom]);
+
+  // perimeter of the threat zone: every edge where a threatened hex meets
+  // one that isn't
+  const contour = useMemo(() => {
+    const cs = overlay?.contour;
+    if (!cs || cs.length === 0) return [];
+    const set = new Set(cs.map((c) => c.q + ',' + c.r));
+    const segs: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
+    for (const c of cs) {
+      for (const [dq, dr] of DIRS) {
+        if (set.has((c.q + dq) + ',' + (c.r + dr))) continue;
+        segs.push(edgeBetween(geom, map.hexSize, c, { q: c.q + dq, r: c.r + dr }));
+      }
+    }
+    return segs;
+  }, [overlay?.contour, geom, map.hexSize]);
 
   const interactive = !!onCell;
   const [view, setView] = useState<View>(() => fitView(geom));
@@ -415,6 +447,19 @@ export function Board({ map, units = [], sources = [], battleMode, overlay, tip,
             </div>
           );
         })}
+        {contour.length > 0 && (
+          <svg
+            className="threat-svg"
+            width={geom.boardW}
+            height={geom.boardH}
+            viewBox={`0 0 ${geom.boardW} ${geom.boardH}`}
+            preserveAspectRatio="none"
+          >
+            {contour.map((s, i) => (
+              <line key={i} x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} />
+            ))}
+          </svg>
+        )}
         {overlay?.line && <PathLine geom={geom} cells={overlay.line} arrow={overlay.arrow} cls={overlay.lineCls} />}
         {units.map((u) => (
           <Token key={u.id} u={u} geom={geom} />

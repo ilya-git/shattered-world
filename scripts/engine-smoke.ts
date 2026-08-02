@@ -1,7 +1,7 @@
 // Quick scripted exercise of the rules engine (not shipped; run with tsx).
 import {
   applyAction, attackTargets, createGame, planeswalkCells, reachableCells,
-  shiftTargets, summonCells, type GameAction, type GameState,
+  shiftTargets, summonCells, threatCells, type GameAction, type GameState,
 } from '../src/game/engine';
 import { MAPS } from '../src/game/maps';
 import { STATS } from '../src/game/data';
@@ -255,6 +255,42 @@ check(STATS.catapult.minRng === 5, 'catapult min range 5');
   check(hg.log.length === before + 1 && hg.log[hg.log.length - 1].text.includes('+2'),
     'log: repeated mends merge into one entry (+2)');
   check(hg.log.some((e) => e.kind === 'summon'), 'log: summons recorded');
+}
+
+// ---- threat projection: move-then-attack envelope, never mana-boosted ----
+{
+  const dist = (a: { q: number; r: number }, b: { q: number; r: number }) =>
+    (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
+  const spawn = (ut: 'swordsman' | 'archer' | 'catapult' | 'healer') => {
+    let tg = createGame(7, 'control', 30, 'a');
+    const slot = summonCells(tg, 'a')[0];
+    tg = applyAction(tg, { kind: 'summon', ut, q: slot.q, r: slot.r });
+    return { g: tg, u: tg.units[0] };
+  };
+
+  // "n/a" attack: both of its options cost mana, so it threatens nothing
+  const hz = spawn('healer');
+  check(threatCells(hz.g, hz.u).length === 0, 'threat: healer threatens nothing');
+
+  // envelope is bounded by move + range, and mana never widens it
+  for (const ut of ['swordsman', 'archer'] as const) {
+    const { g: tg, u } = spawn(ut);
+    const s = STATS[ut];
+    const cells = threatCells(tg, u);
+    check(cells.length > 0, `threat: ${ut} projects a threat zone`);
+    check(cells.every((c) => dist(u, c) <= s.move + s.rng),
+      `threat: ${ut} envelope within move+range (${s.move}+${s.rng})`);
+    const rich = { ...tg, mana: { a: 99, b: 99 } };
+    check(threatCells(rich, u).length === cells.length,
+      `threat: ${ut} ignores mana (no forced march / paid reach)`);
+  }
+
+  // catapult keeps its blind spot: min range 5 can't be undone by move 3
+  const cat = spawn('catapult');
+  check(
+    threatCells(cat.g, cat.u).every((c) => dist(cat.u, c) > 1),
+    'threat: catapult min range 5 still shields its own doorstep',
+  );
 }
 
 console.log(failures ? `\n${failures} FAILURES` : '\nall good');
