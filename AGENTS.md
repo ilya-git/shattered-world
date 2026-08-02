@@ -83,3 +83,7 @@ one screen).
 
 Pushes to `main` deploy to GitHub Pages via `.github/workflows/deploy.yml`.
 Don't commit `dist/` (it's gitignored) or Office lock files (`~$*`).
+
+## Version
+
+Version that is shown on the home screen should be updated with each commit (minor) (v1.0 -> v1.1, etc.)
