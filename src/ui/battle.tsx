@@ -7,7 +7,7 @@ import { DIRS, hexDist, keyOf, type Hex } from '../game/hex';
 import { PASSABLE, STATS, halfCost, type Faction, type UnitType } from '../game/data';
 import {
   attackTargets, canSummon, defenderAura, effectiveTerrain, gradeOk, mapOf,
-  planeswalkCells, reachableCells, shiftTargets, summonCells, threatCells,
+  reachableCells, shiftTargets, summonCells, threatCells,
   translocateDests, unitAt, unitCanAct,
   type GameAction, type GameState, type Unit,
 } from '../game/engine';
@@ -164,13 +164,6 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
             setHover(null);
             return;
           }
-          // out of walking reach — the Planeswalker gets there between
-          // worlds, the engine bills the mana automatically
-          if (!u && planeswalkCells(g, sel).some((c) => c.q === q && c.r === r)) {
-            trySend({ kind: 'move', id: sel.id, q, r }, 'The Planeswalker steps between worlds.');
-            setHover(null);
-            return;
-          }
           break;
         case 'attack':
           if (u && u.faction !== my && attackTargets(g, sel).some((c) => c.q === q && c.r === r)) {
@@ -275,13 +268,6 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
             cells.push({ q: c.q, r: c.r, cls: 'atk-range' });
           });
         }
-        // the Planeswalker's between-worlds hexes ride along with the normal
-        // move range, priced per hex — picking one just spends the mana
-        planeswalkCells(g, sel).forEach((c) => {
-          if (rKeys.has(keyOf(c))) return;
-          const hot = hover && hover.q === c.q && hover.r === c.r;
-          cells.push({ q: c.q, r: c.r, cls: 'surge' + (hot ? ' move-hot' : ''), label: `✦${c.manaCost}` });
-        });
         if (hover && rKeys.has(keyOf(hover))) {
           line = routeTo(sel, hover, rs);
           lineCls = 'move';
@@ -439,8 +425,10 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
       spLabel: s.spLabel,
     };
     if (sel.faction === my && myTurn) {
-      const canBurn = (sel.type === 'swordsman' || sel.type === 'planeswalker') && g.mana[my] > 0;
-      const canMove = sel.moveActs > 0 && !sel.moveLocked && (sel.movePts > 0 || canBurn);
+      // the planeswalker's mana buys passage, not distance — it still needs
+      // move points left, so only the swordsman can march on an empty tank
+      const canMove = sel.moveActs > 0 && !sel.moveLocked &&
+        (sel.movePts > 0 || (sel.type === 'swordsman' && g.mana[my] > 0));
       actions = [
         {
           label: 'Move',
@@ -450,7 +438,7 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
             setMode('move');
             setMsg(
               sel.type === 'planeswalker'
-                ? 'Pick a glowing hex — violet ones step between worlds for ✦1 each.'
+                ? 'Pick a glowing hex — violet ones cross water and cliffs for ✦1 a hex.'
                 : 'Pick a glowing hex — numbers count the steps.',
             );
           },

@@ -355,7 +355,7 @@ const RULES: Array<{ ic: ReactNode; h: string; b: ReactNode }> = [
   {
     ic: <span className="rule-ic"><Icon type="healer" /></span>,
     h: 'Specialists',
-    b: <>The <b>Healer</b> mends or wounds 1 life per ✦1; the <b>Translocator</b> teleports allies or banishes foes to their portal; the <b>Planeswalker</b> crosses anything for ✦1 a hex. None of them can attack or shift.</>,
+    b: <>The <b>Healer</b> mends or wounds 1 life per ✦1; the <b>Translocator</b> teleports allies or banishes foes to their portal; the <b>Planeswalker</b> pays ✦1 to cross any hex — water, cliff or occupied — but never travels past its move. None of them can attack or shift.</>,
   },
 ];
 

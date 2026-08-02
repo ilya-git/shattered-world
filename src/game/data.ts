@@ -58,7 +58,7 @@ export const STATS: Record<UnitType, UnitStats> = {
   },
   planeswalker: {
     name: 'Planeswalker', cost: 8, move: 12, life: 8, atk: 2, def: 0, rng: 1,
-    special: 'planeswalk — moving beyond foot costs ✦1 per hex, over water and any elevation',
+    special: 'planeswalk — ✦1 crosses any single hex (water, cliffs, units); never moves farther than its 12',
     spLabel: 'planeswalk',
   },
   defender: {

@@ -239,6 +239,7 @@ export interface ReachCell extends Hex {
  */
 export function reachableCells(g: GameState, u: Unit): ReachCell[] {
   if (u.moveActs <= 0 || u.moveLocked) return [];
+  if (u.type === 'planeswalker') return planeswalkerReach(g, u);
   const manaBudget = u.type === 'swordsman' ? g.mana[u.faction] : 0;
   const budget = u.movePts + manaBudget;
   if (budget <= 0) return [];
@@ -270,22 +271,53 @@ export function reachableCells(g: GameState, u: Unit): ReachCell[] {
 }
 
 /**
- * Planeswalker: any free standable hex within `mana` hex-distance, ✦1/hex.
- * Offered inside ordinary movement — see the 'move' action, which pays for
- * these automatically when the hex is out of normal walking reach.
+ * Planeswalker: mana buys passage, never distance.
+ *
+ * It walks like anyone else, but any step ordinary movement would refuse —
+ * water, a cliff of more than one grade, a hex somebody is standing in —
+ * costs ✦1 to slip across. Its move points still cap the journey, so no
+ * amount of mana carries it past its printed range; the pool only decides
+ * how much of that range may ignore the ground. It still has to come down
+ * on a hex it could legally stand on.
+ *
+ * Layered by step count rather than plain Dijkstra: cheapest-mana-so-far is
+ * only comparable between paths of the same length, since a longer path may
+ * legitimately be the cheaper one.
  */
-export function planeswalkCells(g: GameState, u: Unit): ReachCell[] {
-  if (u.type !== 'planeswalker' || u.moveActs <= 0 || u.moveLocked) return [];
-  const budget = g.mana[u.faction];
-  const out: ReachCell[] = [];
-  for (const [k] of mapOf(g).terrain) {
-    const [q, r] = k.split(',').map(Number);
-    const d = hexDist(u, { q, r });
-    if (d >= 1 && d <= budget && standable(g, q, r)) {
-      out.push({ q, r, n: d, manaCost: d });
+function planeswalkerReach(g: GameState, u: Unit): ReachCell[] {
+  const steps = u.movePts;
+  const purse = g.mana[u.faction];
+  if (steps <= 0) return [];
+  const terrain = mapOf(g).terrain;
+
+  // frontier[k] : hex -> least mana spent arriving there in exactly k steps
+  let frontier = new Map<string, number>([[keyOf(u), 0]]);
+  const best = new Map<string, ReachCell>();
+  for (let k = 1; k <= steps; k++) {
+    const next = new Map<string, number>();
+    for (const [ck, spent] of frontier) {
+      const [cq, cr] = ck.split(',').map(Number);
+      for (const [dq, dr] of DIRS) {
+        const n = { q: cq + dq, r: cr + dr };
+        const nk = keyOf(n);
+        if (!terrain.has(nk)) continue; // the void is not a hex, even for this one
+        const free = standable(g, n.q, n.r) && gradeOk(g, { q: cq, r: cr }, n);
+        const cost = spent + (free ? 0 : 1);
+        if (cost > purse) continue;
+        const prev = next.get(nk);
+        if (prev === undefined || cost < prev) next.set(nk, cost);
+      }
     }
+    for (const [nk, cost] of next) {
+      const [q, r] = nk.split(',').map(Number);
+      if (!standable(g, q, r)) continue; // may pass over it, may not land on it
+      const prev = best.get(nk);
+      if (!prev || cost < prev.manaCost) best.set(nk, { q, r, n: k, manaCost: cost });
+    }
+    frontier = next;
   }
-  return out;
+  best.delete(keyOf(u));
+  return [...best.values()];
 }
 
 /* ---------- combat targeting ---------- */
@@ -420,10 +452,6 @@ export function unitCanAct(g: GameState, u: Unit): boolean {
   ) {
     return true;
   }
-  if (u.type === 'planeswalker' && u.moveActs > 0 && !u.moveLocked && mana >= 1 &&
-    planeswalkCells(g, u).length > 0) {
-    return true;
-  }
   if (s.atk !== null && u.attacks > 0) {
     if (attackTargets(g, u).length > 0) return true;
     if (shiftTargets(g, u).length > 0) return true;
@@ -556,32 +584,22 @@ export function applyAction(prev: GameState, action: GameAction): GameState {
   switch (action.kind) {
     case 'move': {
       const cell = reachableCells(g, u).find((c) => c.q === action.q && c.r === action.r);
-      if (cell) {
-        if (cell.manaCost > 0) spendMana(g, f, cell.manaCost);
-        u.q = action.q;
-        u.r = action.r;
-        u.movePts = Math.max(0, u.movePts - cell.n);
-        u.moveActs -= 1;
-        if (u.moveActs <= 0) u.movePts = 0;
-        u.moved = true;
-        g.actedThisTurn = true;
-        pushLog(g, 'move', `${STATS[u.type].name} marches ${cell.n} hex${cell.n > 1 ? 'es' : ''}${cell.manaCost > 0 ? ` (forced march ✦${cell.manaCost})` : ''}`);
-        break;
-      }
-      // …otherwise the Planeswalker may step between worlds to get there,
-      // paying ✦1 per hex out of the pool automatically — the same shape as
-      // the swordsman's forced march, so both live on the Move action.
-      const pw = planeswalkCells(g, u).find((c) => c.q === action.q && c.r === action.r);
-      need(pw, 'unreachable');
-      spendMana(g, f, pw.manaCost);
+      need(cell, 'unreachable');
+      if (cell.manaCost > 0) spendMana(g, f, cell.manaCost);
       u.q = action.q;
       u.r = action.r;
+      u.movePts = Math.max(0, u.movePts - cell.n);
       u.moveActs -= 1;
-      u.movePts = 0;
+      if (u.moveActs <= 0) u.movePts = 0;
       u.moved = true;
       g.actedThisTurn = true;
-      g.lastEvent = 'planeswalked';
-      pushLog(g, 'move', `Planeswalker steps between worlds — ${pw.n} hex${pw.n > 1 ? 'es' : ''} (✦${pw.manaCost})`);
+      const hexes = `${cell.n} hex${cell.n > 1 ? 'es' : ''}`;
+      if (u.type === 'planeswalker' && cell.manaCost > 0) {
+        g.lastEvent = 'planeswalked';
+        pushLog(g, 'move', `Planeswalker slips between worlds — ${hexes} (✦${cell.manaCost})`);
+      } else {
+        pushLog(g, 'move', `${STATS[u.type].name} marches ${hexes}${cell.manaCost > 0 ? ` (forced march ✦${cell.manaCost})` : ''}`);
+      }
       break;
     }
 

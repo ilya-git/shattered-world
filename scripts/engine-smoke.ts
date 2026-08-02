@@ -1,6 +1,6 @@
 // Quick scripted exercise of the rules engine (not shipped; run with tsx).
 import {
-  applyAction, attackTargets, createGame, planeswalkCells, reachableCells,
+  applyAction, attackTargets, createGame, reachableCells,
   shiftTargets, summonCells, threatCells, type GameAction, type GameState,
 } from '../src/game/engine';
 import { MAPS } from '../src/game/maps';
@@ -72,15 +72,28 @@ check(g.mana.b === 30, 'no income without sources');
 const slotB = summonCells(g, 'b');
 g = applyAction(g, { kind: 'summon', ut: 'planeswalker', q: slotB[0].q, r: slotB[0].r });
 const pw = g.units.find((u) => u.type === 'planeswalker')!;
-const pwc = planeswalkCells(g, pw);
-check(pwc.length > 0 && pwc.every((c) => c.manaCost === c.n), 'planeswalk ✦1/hex');
-// walking beats walking between worlds: a hex the planeswalker can simply
-// stroll to is still free, even though planeswalk also offers it
-const walkKeys = new Set(reachableCells(g, pw).map((c) => c.q + ',' + c.r));
-const both = pwc.find((c) => walkKeys.has(c.q + ',' + c.r));
-check(!!both, 'some hexes are reachable both on foot and between worlds');
+const pwr = reachableCells(g, pw);
+// mana buys passage, never distance: nothing outside the printed move
+check(pwr.length > 0, 'planeswalker has moves');
+check(pwr.every((c) => c.n <= STATS.planeswalker.move),
+  `planeswalk never reaches past its move (${STATS.planeswalker.move})`);
+check(pwr.every((c) => c.manaCost <= c.n), 'planeswalk charges at most ✦1 per hex crossed');
+check(pwr.some((c) => c.manaCost > 0), 'planeswalk offers hexes the ground would refuse');
+// a purse can't stretch the range, only smooth the ground under it
+{
+  const broke = { ...g, mana: { a: g.mana.a, b: 0 } };
+  const poor = reachableCells(broke, pw);
+  const rich = reachableCells({ ...g, mana: { a: g.mana.a, b: 99 } }, pw);
+  check(poor.every((c) => c.manaCost === 0), 'with an empty purse it walks like anyone else');
+  check(rich.every((c) => c.n <= STATS.planeswalker.move), 'a full purse still respects the move cap');
+  check(rich.length > poor.length, 'mana opens ground that was closed, not distance');
+}
+// walking stays free where the ground allows it
+const onFoot = pwr.filter((c) => c.manaCost === 0);
+check(onFoot.length > 0, 'plenty of hexes cost the planeswalker nothing');
 const manaBefore = g.mana.b;
-g = applyAction(g, { kind: 'move', id: pw.id, q: both!.q, r: both!.r });
+const step = onFoot.sort((x, y) => y.n - x.n)[0];
+g = applyAction(g, { kind: 'move', id: pw.id, q: step.q, r: step.r });
 check(g.mana.b === manaBefore, 'ordinary walking stays free for the planeswalker');
 g = applyAction(g, { kind: 'endTurn' });
 
@@ -196,18 +209,17 @@ check(STATS.defender.life === 8, 'defender life 8 (house rule)');
   check(cells.length === 7, 'amphis: 7 free summon hexes');
   let g2 = applyAction(ag, { kind: 'summon', ut: 'planeswalker', q: cells[0].q, r: cells[0].r });
   const pw2 = g2.units[0];
-  check(planeswalkCells(g2, pw2).length > 0, 'amphis: planeswalk works');
-  // a hex only the between-worlds step can reach: Move pays ✦1/hex itself
+  // a hex the ground refuses: Move bills the passage itself
   {
-    const walk = new Set(reachableCells(g2, pw2).map((c) => c.q + ',' + c.r));
-    const only = planeswalkCells(g2, pw2).filter((c) => !walk.has(c.q + ',' + c.r));
-    check(only.length > 0, 'amphis: some hexes need the between-worlds step');
-    const dest = only.sort((x, y) => y.n - x.n)[0];
+    const paid = reachableCells(g2, pw2).filter((c) => c.manaCost > 0);
+    check(paid.length > 0, 'amphis: some hexes need mana to cross to');
+    const dest = paid.sort((x, y) => y.manaCost - x.manaCost)[0];
     const before = g2.mana.a;
     g2 = applyAction(g2, { kind: 'move', id: pw2.id, q: dest.q, r: dest.r });
     const moved = g2.units.find((u) => u.id === pw2.id)!;
     check(moved.q === dest.q && moved.r === dest.r, 'amphis: planeswalker arrived via Move');
-    check(g2.mana.a === before - dest.n, `amphis: Move billed ✦${dest.n} automatically`);
+    check(g2.mana.a === before - dest.manaCost, `amphis: Move billed ✦${dest.manaCost} automatically`);
+    check(dest.n <= STATS.planeswalker.move, 'amphis: the paid hex is still inside its move');
   }
   const r2 = reachableCells(g2, pw2);
   check(r2.length > 0, 'amphis: movement works on the big map');

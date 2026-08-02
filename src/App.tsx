@@ -51,6 +51,8 @@ export default function App() {
   mapRef.current = mapId;
 
   const startLocal = (seed: number, m: GameMode, mp: MapId) => {
+    clearSave(); // a fresh battle retires whatever was in the slot
+    setSaved(null);
     setGame(createGame(seed, m, startManaFor(m), 'a', mp));
     setRematchAsked(false);
     setRoute({ s: 'battle' });
@@ -72,6 +74,8 @@ export default function App() {
       setMode(msg.mode);
       setMapId(msg.mapId);
       // a resuming host ships the whole state; otherwise deal from the seed
+      if (!msg.state) clearSave(); // the guest's own old battle is retired too
+      setSaved(null);
       setGame(msg.state ?? createGame(msg.seed, msg.mode, msg.startMana, 'a', msg.mapId));
       setRematchAsked(false);
       setRoute({ s: 'battle' });
@@ -136,6 +140,11 @@ export default function App() {
       setMapId(carry.mapId);
       modeRef.current = carry.mode;
       mapRef.current = carry.mapId;
+    } else {
+      // chose to start over: the old battle is retired there and then, not
+      // merely overwritten once the new one gets under way
+      clearSave();
+      setSaved(null);
     }
     setRoute({ s: 'host' });
     const net = makeNet();
@@ -286,6 +295,8 @@ export default function App() {
     <TitleScreen
       onRules={() => setRoute({ s: 'rules' })}
       onHotseat={() => {
+        clearSave(); // a hotseat table always starts a fresh battle
+        setSaved(null);
         setHotseat(true);
         setIsHost(true);
         setMode('control');
