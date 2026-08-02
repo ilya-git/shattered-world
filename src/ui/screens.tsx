@@ -15,7 +15,7 @@ const HERO_UNITS: DisplayUnit[] = [
   { id: 1, q: -1, r: 0, type: 'swordsman', faction: 'a', hp: 10, maxHp: 10 },
   { id: 2, q: -1, r: 2, type: 'archer', faction: 'a', hp: 7, maxHp: 7 },
   { id: 3, q: -3, r: 2, type: 'healer', faction: 'a', hp: 6, maxHp: 6 },
-  { id: 4, q: -2, r: -1, type: 'defender', faction: 'a', hp: 5, maxHp: 5 },
+  { id: 4, q: -2, r: -1, type: 'defender', faction: 'a', hp: 8, maxHp: 8 },
   { id: 5, q: 1, r: 0, type: 'barbarian', faction: 'b', hp: 9, maxHp: 12 },
   { id: 6, q: 2, r: -2, type: 'mountedarcher', faction: 'b', hp: 8, maxHp: 8 },
   { id: 7, q: 2, r: -4, type: 'catapult', faction: 'b', hp: 4, maxHp: 4 },
@@ -271,7 +271,7 @@ const RULES: Array<{ ic: ReactNode; h: string; b: ReactNode }> = [
   {
     ic: <span className="rule-ic ri-mana">✦</span>,
     h: 'Mana & Turns',
-    b: <>Each turn: gain <b>✦1 per Source</b> you control, then summon, then move &amp; attack. Once you move or attack, the summoning portal closes for the turn.</>,
+    b: <>Each turn: gain <b>✦1 per Source</b> you control, then summon, move and attack in any order — the summoning portal stays open all turn.</>,
   },
   {
     ic: <span className="rule-ic"><Icon type="archer" /></span>,

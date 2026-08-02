@@ -151,6 +151,7 @@ html, body { margin: 0; padding: 0; }
   display: flex; flex-direction: column; line-height: 1.1; max-width: 64px; }
 .wc-dock-note { font-size: 12px; font-weight: 400; opacity: .8; }
 .wc-dock-items { display: flex; gap: 3px; }
+.wc-su-slot { display: flex; }
 .wc-summon { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 66px; padding: 7px 2px;
   border-radius: 3px; border: 1.3px solid var(--wc-ink-soft); background: transparent; color: var(--wc-ink);
   cursor: pointer; font-family: 'IM Fell English', serif; }
@@ -162,6 +163,22 @@ html, body { margin: 0; padding: 0; }
 .wc-su-c { font-size: 11px; font-style: italic; opacity: .7; }
 .wc-summon:disabled { opacity: .45; cursor: not-allowed; }
 .wc-summon.picked { box-shadow: inset 0 0 0 2px var(--wc-accent); border-color: var(--wc-accent); }
+
+/* hover card over the dock: full stat line for the unit under the cursor */
+.dock-tip { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(100% + 8px);
+  width: 300px; padding: 9px 12px; z-index: 12; pointer-events: none;
+  background: var(--wc-paper); border: 1.5px solid var(--wc-ink); border-radius: 3px;
+  box-shadow: 0 8px 20px rgba(0,0,0,.2); }
+.dock-tip-h { display: flex; align-items: baseline; justify-content: space-between; font-size: 15px; }
+.dock-tip-cost { font-size: 13px; color: var(--wc-gem); }
+.dock-tip-stats { display: flex; gap: 12px; margin: 5px 0 6px; font-size: 13px; }
+.dock-tip-stats i { font-style: normal; font-size: 9px; letter-spacing: .5px; opacity: .55; margin-right: 3px; }
+.dock-tip-note { font-size: 12px; line-height: 1.4; font-style: italic; opacity: .85; }
+.dock-tip-l { display: block; font-family: 'Caveat', cursive; font-style: normal;
+  font-size: 13px; opacity: .7; }
+.skin-pix .dock-tip { background: var(--pix-panel) repeat; border: 3px solid #5a3818; border-radius: 0;
+  box-shadow: inset 0 0 0 2px #d9a441, 0 4px 0 rgba(0,0,0,.3); }
+.skin-pix .dock-tip-note, .skin-pix .dock-tip-l { font-style: normal; font-family: 'VT323', monospace; }
 
 /* ===== board overlays ===== */
 .hl { position: absolute; z-index: 4; pointer-events: none; display: flex; align-items: center; justify-content: center;

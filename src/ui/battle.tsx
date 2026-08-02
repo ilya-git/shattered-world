@@ -16,7 +16,7 @@ import { Board, type DisplayUnit, type Overlay, type OverlayCell, type Tip } fro
 import { CombatPanel, Screen, SkinToggle, SummonDock, TopBar, UnitCard, type CardAction } from './panels';
 
 type UiMode =
-  | 'idle' | 'move' | 'planeswalk' | 'attack' | 'shift'
+  | 'idle' | 'move' | 'attack' | 'shift'
   | 'heal' | 'wound' | 'transloc-pick' | 'transloc-dest' | 'banish' | 'summon';
 
 const within = (map: MapDef, o: Hex, n: number): Hex[] =>
@@ -104,7 +104,7 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
       setHover(null);
       setMsg(
         myTurn
-          ? 'Your turn — summon first if you wish; the portal closes once you act.'
+          ? 'Your turn — move, attack and summon in any order.'
           : '',
       );
     }
@@ -164,11 +164,11 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
             setHover(null);
             return;
           }
-          break;
-        case 'planeswalk':
+          // out of walking reach — the Planeswalker gets there between
+          // worlds, the engine bills the mana automatically
           if (!u && planeswalkCells(g, sel).some((c) => c.q === q && c.r === r)) {
-            trySend({ kind: 'planeswalk', id: sel.id, q, r }, 'The Planeswalker steps between worlds.');
-            setMode('move');
+            trySend({ kind: 'move', id: sel.id, q, r }, 'The Planeswalker steps between worlds.');
+            setHover(null);
             return;
           }
           break;
@@ -275,15 +275,18 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
             cells.push({ q: c.q, r: c.r, cls: 'atk-range' });
           });
         }
+        // the Planeswalker's between-worlds hexes ride along with the normal
+        // move range, priced per hex — picking one just spends the mana
+        planeswalkCells(g, sel).forEach((c) => {
+          if (rKeys.has(keyOf(c))) return;
+          const hot = hover && hover.q === c.q && hover.r === c.r;
+          cells.push({ q: c.q, r: c.r, cls: 'surge' + (hot ? ' move-hot' : ''), label: `✦${c.manaCost}` });
+        });
         if (hover && rKeys.has(keyOf(hover))) {
           line = routeTo(sel, hover, rs);
           lineCls = 'move';
           arrow = true;
         }
-      } else if (mode === 'planeswalk') {
-        planeswalkCells(g, sel).forEach((c) =>
-          cells.push({ q: c.q, r: c.r, cls: 'shift', label: `✦${c.manaCost}` }),
-        );
       } else if (mode === 'attack') {
         const s = STATS[sel.type];
         const ts = attackTargets(g, sel);
@@ -436,18 +439,23 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
       spLabel: s.spLabel,
     };
     if (sel.faction === my && myTurn) {
-      const canMove = sel.moveActs > 0 && !sel.moveLocked && (sel.movePts > 0 || (sel.type === 'swordsman' && g.mana[my] > 0));
+      const canBurn = (sel.type === 'swordsman' || sel.type === 'planeswalker') && g.mana[my] > 0;
+      const canMove = sel.moveActs > 0 && !sel.moveLocked && (sel.movePts > 0 || canBurn);
       actions = [
-        { label: 'Move', active: mode === 'move', disabled: !canMove, onClick: () => { setMode('move'); setMsg('Pick a glowing hex — numbers count the steps.'); } },
+        {
+          label: 'Move',
+          active: mode === 'move',
+          disabled: !canMove,
+          onClick: () => {
+            setMode('move');
+            setMsg(
+              sel.type === 'planeswalker'
+                ? 'Pick a glowing hex — violet ones step between worlds for ✦1 each.'
+                : 'Pick a glowing hex — numbers count the steps.',
+            );
+          },
+        },
       ];
-      if (sel.type === 'planeswalker') {
-        actions.push({
-          label: 'Walk ✦',
-          active: mode === 'planeswalk',
-          disabled: sel.moveActs <= 0 || sel.moveLocked || g.mana[my] < 1,
-          onClick: () => { setMode('planeswalk'); setMsg('Planeswalk — ✦1 per hex, over water and peaks alike.'); },
-        });
-      }
       if (s.atk !== null) {
         actions.push({
           label: 'Attack',
@@ -623,9 +631,8 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
         faction={my}
         mana={g.mana[my]}
         activeType={summonType}
-        disabledAll={!myTurn || g.actedThisTurn}
+        disabledAll={!myTurn}
         dim={myTurn && !summonOpen}
-        note={g.actedThisTurn ? 'portal closed' : undefined}
         onPick={(t) => {
           setSummonType(t);
           setSelId(null);

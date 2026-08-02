@@ -2,7 +2,7 @@
 // combat dice readout, and the summon dock — extended to the full nine-unit
 // roster from Rules.docx.
 
-import type { CSSProperties, ReactNode } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import { STATS, UNIT_ORDER, type Faction, type UnitType } from '../game/data';
 import { UnitPic } from './icons';
 import { setSkin, useSkin } from './skin';
@@ -187,6 +187,8 @@ export function SummonDock({ mana, onPick, activeType, disabledAll, dim, note, f
   note?: string;
   faction?: Faction;
 }) {
+  const [peek, setPeek] = useState<UnitType | null>(null);
+  const s = peek ? STATS[peek] : null;
   return (
     <div className={'wc-panel wc-dock' + (dim ? ' dim' : '')}>
       <div className="wc-dock-l">
@@ -195,21 +197,52 @@ export function SummonDock({ mana, onPick, activeType, disabledAll, dim, note, f
       </div>
       <div className="wc-dock-items">
         {UNIT_ORDER.map((t) => (
-          <button
+          // the hover lives on the wrapper: a disabled button (one you can't
+          // afford yet) fires no pointer events, and that is exactly when you
+          // want to read its stats
+          <span
             key={t}
-            className={'wc-summon' + (activeType === t ? ' picked' : '')}
-            disabled={STATS[t].cost > mana || disabledAll}
-            onClick={onPick ? () => onPick(t) : undefined}
-            title={STATS[t].special}
+            className="wc-su-slot"
+            onMouseEnter={() => setPeek(t)}
+            onMouseLeave={() => setPeek((p) => (p === t ? null : p))}
           >
-            <span className="wc-su-ic" style={{ '--tok-c': 'var(--c-fa)' } as CSSProperties}>
-              <UnitPic type={t} faction={faction} />
-            </span>
-            <span className="wc-su-n">{STATS[t].name}</span>
-            <span className="wc-su-c">✦{STATS[t].cost}</span>
-          </button>
+            <button
+              className={'wc-summon' + (activeType === t ? ' picked' : '')}
+              disabled={STATS[t].cost > mana || disabledAll}
+              onClick={onPick ? () => onPick(t) : undefined}
+            >
+              <span className="wc-su-ic" style={{ '--tok-c': 'var(--c-fa)' } as CSSProperties}>
+                <UnitPic type={t} faction={faction} />
+              </span>
+              <span className="wc-su-n">{STATS[t].name}</span>
+              <span className="wc-su-c">✦{STATS[t].cost}</span>
+            </button>
+          </span>
         ))}
       </div>
+      {s && (
+        <div className="dock-tip">
+          <div className="dock-tip-h">
+            <b>{s.name}</b>
+            <span className="dock-tip-cost">✦{s.cost}</span>
+          </div>
+          <div className="dock-tip-stats">
+            {([
+              ['MOV', s.move], ['LIFE', s.life], ['ATK', s.atk ?? '—'],
+              ['DEF', s.def], ['RNG', s.rng],
+            ] as Array<[string, ReactNode]>).map(([k, v]) => (
+              <span key={k}>
+                <i>{k}</i>
+                {v}
+              </span>
+            ))}
+          </div>
+          <div className="dock-tip-note">
+            <span className="dock-tip-l">{s.spLabel || 'special'}</span>
+            {s.special}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

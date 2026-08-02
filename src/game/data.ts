@@ -58,11 +58,12 @@ export const STATS: Record<UnitType, UnitStats> = {
   },
   planeswalker: {
     name: 'Planeswalker', cost: 8, move: 12, life: 8, atk: 2, def: 0, rng: 1,
-    special: 'planeswalk — ✦1 per hex, freely over water and any elevation',
+    special: 'planeswalk — moving beyond foot costs ✦1 per hex, over water and any elevation',
     spLabel: 'planeswalk',
   },
   defender: {
-    name: 'Defender', cost: 10, move: 6, life: 5, atk: 0, def: 2, rng: 1,
+    // house rule: life 8 (Appendix 1 prints 5)
+    name: 'Defender', cost: 10, move: 6, life: 8, atk: 0, def: 2, rng: 1,
     special: '+2 DEF to friendly units in adjacent hexes (bonuses don’t stack)',
     spLabel: 'guard',
   },

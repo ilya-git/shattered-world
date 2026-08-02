@@ -52,8 +52,16 @@ const sixStep = reach.filter((c) => c.manaCost === 0);
 check(sixStep.every((c) => c.n <= 6), 'free reach ≤ 6 move points');
 const dest = sixStep.sort((x, y) => y.n - x.n)[0];
 g = applyAction(g, { kind: 'move', id: sword.id, q: dest.q, r: dest.r });
-check(g.actedThisTurn, 'moving closes the portal');
-expectThrow(g, { kind: 'summon', ut: 'healer', q: slotA[0].q, r: slotA[0].r }, 'no summon after acting');
+check(g.actedThisTurn, 'moving records the first action of the turn');
+// house rule (diverges from Rules.docx "you cannot summon … after you have
+// made a move or attack"): the portal stays open for the whole turn
+{
+  const freed = summonCells(g, 'a');
+  check(freed.length > 0, 'the moved unit frees its portal hex');
+  const manaBefore = g.mana.a;
+  g = applyAction(g, { kind: 'summon', ut: 'healer', q: freed[0].q, r: freed[0].r });
+  check(g.mana.a === manaBefore - STATS.healer.cost, 'summoning still allowed after moving');
+}
 check(reachableCells(g, g.units.find((u) => u.id === sword.id)!).length === 0, 'one move action per turn');
 
 g = applyAction(g, { kind: 'endTurn' });
@@ -66,10 +74,14 @@ g = applyAction(g, { kind: 'summon', ut: 'planeswalker', q: slotB[0].q, r: slotB
 const pw = g.units.find((u) => u.type === 'planeswalker')!;
 const pwc = planeswalkCells(g, pw);
 check(pwc.length > 0 && pwc.every((c) => c.manaCost === c.n), 'planeswalk ✦1/hex');
-const far = pwc.sort((x, y) => y.n - x.n)[0];
+// walking beats walking between worlds: a hex the planeswalker can simply
+// stroll to is still free, even though planeswalk also offers it
+const walkKeys = new Set(reachableCells(g, pw).map((c) => c.q + ',' + c.r));
+const both = pwc.find((c) => walkKeys.has(c.q + ',' + c.r));
+check(!!both, 'some hexes are reachable both on foot and between worlds');
 const manaBefore = g.mana.b;
-g = applyAction(g, { kind: 'planeswalk', id: pw.id, q: far.q, r: far.r });
-check(g.mana.b === manaBefore - far.n, 'planeswalk charged correctly');
+g = applyAction(g, { kind: 'move', id: pw.id, q: both!.q, r: both!.r });
+check(g.mana.b === manaBefore, 'ordinary walking stays free for the planeswalker');
 g = applyAction(g, { kind: 'endTurn' });
 
 // shifting: drop a swordsman next to a source artificially via many turns is
@@ -169,6 +181,8 @@ const highFoe = { id: 100, type: 'barbarian' as const, faction: 'b' as const, q:
 eg.units.push(gsword, highFoe);
 check(attackTargets(eg, gsword).length === 0, 'melee blocked across two elevation grades');
 check(STATS.catapult.minRng === 5, 'catapult min range 5');
+// house rule: Defender life 8 (Appendix 1 prints 5)
+check(STATS.defender.life === 8, 'defender life 8 (house rule)');
 
 
 // ---- World of Amphis (rulebook sample map) sanity ----
@@ -183,6 +197,18 @@ check(STATS.catapult.minRng === 5, 'catapult min range 5');
   let g2 = applyAction(ag, { kind: 'summon', ut: 'planeswalker', q: cells[0].q, r: cells[0].r });
   const pw2 = g2.units[0];
   check(planeswalkCells(g2, pw2).length > 0, 'amphis: planeswalk works');
+  // a hex only the between-worlds step can reach: Move pays ✦1/hex itself
+  {
+    const walk = new Set(reachableCells(g2, pw2).map((c) => c.q + ',' + c.r));
+    const only = planeswalkCells(g2, pw2).filter((c) => !walk.has(c.q + ',' + c.r));
+    check(only.length > 0, 'amphis: some hexes need the between-worlds step');
+    const dest = only.sort((x, y) => y.n - x.n)[0];
+    const before = g2.mana.a;
+    g2 = applyAction(g2, { kind: 'move', id: pw2.id, q: dest.q, r: dest.r });
+    const moved = g2.units.find((u) => u.id === pw2.id)!;
+    check(moved.q === dest.q && moved.r === dest.r, 'amphis: planeswalker arrived via Move');
+    check(g2.mana.a === before - dest.n, `amphis: Move billed ✦${dest.n} automatically`);
+  }
   const r2 = reachableCells(g2, pw2);
   check(r2.length > 0, 'amphis: movement works on the big map');
 }

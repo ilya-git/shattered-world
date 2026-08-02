@@ -105,7 +105,6 @@ export interface GameState {
 export type GameAction =
   | { kind: 'summon'; ut: UnitType; q: number; r: number }
   | { kind: 'move'; id: number; q: number; r: number }
-  | { kind: 'planeswalk'; id: number; q: number; r: number }
   | { kind: 'attack'; id: number; q: number; r: number }
   | { kind: 'shift'; id: number; q: number; r: number }
   | { kind: 'heal'; id: number; targetId: number }
@@ -270,7 +269,11 @@ export function reachableCells(g: GameState, u: Unit): ReachCell[] {
   return out;
 }
 
-/** Planeswalker: any free standable hex within `mana` hex-distance, ✦1/hex. */
+/**
+ * Planeswalker: any free standable hex within `mana` hex-distance, ✦1/hex.
+ * Offered inside ordinary movement — see the 'move' action, which pays for
+ * these automatically when the hex is out of normal walking reach.
+ */
 export function planeswalkCells(g: GameState, u: Unit): ReachCell[] {
   if (u.type !== 'planeswalker' || u.moveActs <= 0 || u.moveLocked) return [];
   const budget = g.mana[u.faction];
@@ -452,9 +455,16 @@ export function unitCanAct(g: GameState, u: Unit): boolean {
 
 const CHEAPEST_UNIT = Math.min(...Object.values(STATS).map((s) => s.cost));
 
-/** Could the current player still summon something this turn? */
+/**
+ * Could the current player still summon something this turn?
+ *
+ * House rule: the portal stays open all turn. Rules.docx says "You cannot
+ * summon any units during your turn after you have made a move or attack";
+ * `actedThisTurn` still records that first action for anything else that
+ * wants it, but it no longer gates summoning.
+ */
 export function canSummon(g: GameState): boolean {
-  return !g.actedThisTurn && g.mana[g.turn] >= CHEAPEST_UNIT && summonCells(g, g.turn).length > 0;
+  return g.mana[g.turn] >= CHEAPEST_UNIT && summonCells(g, g.turn).length > 0;
 }
 
 /* ---------- internal mutations (operate on a cloned state) ---------- */
@@ -524,7 +534,7 @@ export function applyAction(prev: GameState, action: GameAction): GameState {
   }
 
   if (action.kind === 'summon') {
-    need(!g.actedThisTurn, 'summoning ends once you move or attack');
+    // house rule: the portal stays open all turn (see canSummon)
     const cost = STATS[action.ut].cost;
     need(g.mana[f] >= cost, 'not enough mana');
     need(
@@ -546,23 +556,24 @@ export function applyAction(prev: GameState, action: GameAction): GameState {
   switch (action.kind) {
     case 'move': {
       const cell = reachableCells(g, u).find((c) => c.q === action.q && c.r === action.r);
-      need(cell, 'unreachable');
-      if (cell.manaCost > 0) spendMana(g, f, cell.manaCost);
-      u.q = action.q;
-      u.r = action.r;
-      u.movePts = Math.max(0, u.movePts - cell.n);
-      u.moveActs -= 1;
-      if (u.moveActs <= 0) u.movePts = 0;
-      u.moved = true;
-      g.actedThisTurn = true;
-      pushLog(g, 'move', `${STATS[u.type].name} marches ${cell.n} hex${cell.n > 1 ? 'es' : ''}${cell.manaCost > 0 ? ` (forced march ✦${cell.manaCost})` : ''}`);
-      break;
-    }
-
-    case 'planeswalk': {
-      const cell = planeswalkCells(g, u).find((c) => c.q === action.q && c.r === action.r);
-      need(cell, 'out of planeswalk reach');
-      spendMana(g, f, cell.manaCost);
+      if (cell) {
+        if (cell.manaCost > 0) spendMana(g, f, cell.manaCost);
+        u.q = action.q;
+        u.r = action.r;
+        u.movePts = Math.max(0, u.movePts - cell.n);
+        u.moveActs -= 1;
+        if (u.moveActs <= 0) u.movePts = 0;
+        u.moved = true;
+        g.actedThisTurn = true;
+        pushLog(g, 'move', `${STATS[u.type].name} marches ${cell.n} hex${cell.n > 1 ? 'es' : ''}${cell.manaCost > 0 ? ` (forced march ✦${cell.manaCost})` : ''}`);
+        break;
+      }
+      // …otherwise the Planeswalker may step between worlds to get there,
+      // paying ✦1 per hex out of the pool automatically — the same shape as
+      // the swordsman's forced march, so both live on the Move action.
+      const pw = planeswalkCells(g, u).find((c) => c.q === action.q && c.r === action.r);
+      need(pw, 'unreachable');
+      spendMana(g, f, pw.manaCost);
       u.q = action.q;
       u.r = action.r;
       u.moveActs -= 1;
@@ -570,7 +581,7 @@ export function applyAction(prev: GameState, action: GameAction): GameState {
       u.moved = true;
       g.actedThisTurn = true;
       g.lastEvent = 'planeswalked';
-      pushLog(g, 'move', `Planeswalker steps between worlds — ${cell.n} hexes (✦${cell.manaCost})`);
+      pushLog(g, 'move', `Planeswalker steps between worlds — ${pw.n} hex${pw.n > 1 ? 'es' : ''} (✦${pw.manaCost})`);
       break;
     }
 
