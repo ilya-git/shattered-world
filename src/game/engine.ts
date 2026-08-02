@@ -481,6 +481,19 @@ export function unitCanAct(g: GameState, u: Unit): boolean {
   return false;
 }
 
+/**
+ * Can this action be taken back?
+ *
+ * Everything the engine does is deterministic except the attack, which is
+ * the only caller of `rollD6`. Taking a roll back would let a player shop
+ * for a better one — undo, act in a different order, and the seeded stream
+ * deals different dice — so an attack is a hard barrier, as are the ends of
+ * turns and the game. Everything else is bookkeeping and comes back cleanly.
+ */
+export function undoable(a: GameAction): boolean {
+  return a.kind !== 'attack' && a.kind !== 'endTurn' && a.kind !== 'resign';
+}
+
 const CHEAPEST_UNIT = Math.min(...Object.values(STATS).map((s) => s.cost));
 
 /**

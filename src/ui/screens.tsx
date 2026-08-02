@@ -73,7 +73,7 @@ export function TitleScreen({ onHost, onJoin, onHotseat, onRules }: { onHost: ()
         </div>
       </div>
       <div className="title-foot">
-        <span>v1.0 · the parchment update</span>
+        <span>v1.1 · the parchment update</span>
         <SkinToggle />
         <span>control all nine Sources for three turns to win</span>
       </div>

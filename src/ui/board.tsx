@@ -80,6 +80,8 @@ export interface Overlay {
   reticle?: { q: number; r: number } | null;
   /** hexes to trace a perimeter around (enemy threat zone) */
   contour?: Array<{ q: number; r: number }>;
+  /** the contour belongs to one hovered unit rather than the whole army */
+  contourFocus?: boolean;
 }
 
 /**
@@ -449,7 +451,7 @@ export function Board({ map, units = [], sources = [], battleMode, overlay, tip,
         })}
         {contour.length > 0 && (
           <svg
-            className="threat-svg"
+            className={'threat-svg' + (overlay?.contourFocus ? ' focus' : '')}
             width={geom.boardW}
             height={geom.boardH}
             viewBox={`0 0 ${geom.boardW} ${geom.boardH}`}

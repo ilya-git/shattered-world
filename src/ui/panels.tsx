@@ -68,7 +68,13 @@ export function Die({ value }: { value: number }) {
   );
 }
 
-export function TopBar({ turn, mana }: { turn: { faction: Faction; label: string; sub: string }; mana: { n: number; sub: string } }) {
+export function TopBar({ turn, mana, foe }: {
+  turn: { faction: Faction; label: string; sub: string };
+  mana: { n: number; sub: string };
+  /** the other side's purse — no secrets in this game, and it decides what
+   *  they can summon or pay for next */
+  foe?: { n: number; sub: string; faction: Faction };
+}) {
   return (
     <div className="wc-panel wc-top">
       <div className="wc-turn">
@@ -79,10 +85,19 @@ export function TopBar({ turn, mana }: { turn: { faction: Faction; label: string
         </span>
       </div>
       <div className="wc-wordmark">Shattered World</div>
-      <div className="wc-mana">
-        <span className="wc-gem">✦</span>
-        <span className="wc-mana-n">{mana.n}</span>
-        <span className="wc-mana-s">{mana.sub}</span>
+      <div className="wc-mana-pair">
+        <div className="wc-mana">
+          <span className="wc-gem">✦</span>
+          <span className="wc-mana-n">{mana.n}</span>
+          <span className="wc-mana-s">{mana.sub}</span>
+        </div>
+        {foe && (
+          <div className="wc-mana foe">
+            <span className={'wc-dot f' + foe.faction}></span>
+            <span className="wc-mana-n">{foe.n}</span>
+            <span className="wc-mana-s">{foe.sub}</span>
+          </div>
+        )}
       </div>
     </div>
   );

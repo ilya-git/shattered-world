@@ -1,7 +1,7 @@
 // Quick scripted exercise of the rules engine (not shipped; run with tsx).
 import {
   applyAction, attackTargets, createGame, reachableCells,
-  shiftTargets, summonCells, threatCells, type GameAction, type GameState,
+  shiftTargets, summonCells, threatCells, undoable, type GameAction, type GameState,
 } from '../src/game/engine';
 import { MAPS } from '../src/game/maps';
 import { STATS } from '../src/game/data';
@@ -344,6 +344,42 @@ check(STATS.defender.life === 8, 'defender life 8 (house rule)');
   let a = sg, b = trip;
   for (const act of seq) { a = applyAction(a, act); b = applyAction(b, act); }
   check(JSON.stringify(a) === JSON.stringify(b), 'save: a resumed state replays identically');
+}
+
+// ---- undo: everything bloodless comes back, dice never do ----
+{
+  check(!undoable({ kind: 'attack', id: 1, q: 0, r: 0 }), 'undo: an attack is a barrier');
+  check(!undoable({ kind: 'endTurn' }), 'undo: the end of a turn is a barrier');
+  check(!undoable({ kind: 'resign', faction: 'a' }), 'undo: resigning is a barrier');
+  for (const a of [
+    { kind: 'move', id: 1, q: 0, r: 0 },
+    { kind: 'shift', id: 1, q: 0, r: 0 },
+    { kind: 'heal', id: 1, targetId: 2 },
+    { kind: 'wound', id: 1, targetId: 2 },
+    { kind: 'summon', ut: 'archer', q: 0, r: 0 },
+    { kind: 'translocate', id: 1, targetId: 2, q: 0, r: 0 },
+    { kind: 'banish', id: 1, targetId: 2 },
+  ] as GameAction[]) {
+    check(undoable(a), `undo: ${a.kind} can be taken back`);
+  }
+  // the attack is the only thing that touches the dice, which is what makes
+  // the barrier above the right one
+  let ug = createGame(77, 'control', 30, 'a');
+  const us = summonCells(ug, 'a');
+  const before = ug.rng;
+  ug = applyAction(ug, { kind: 'summon', ut: 'swordsman', q: us[0].q, r: us[0].r });
+  const sword2 = ug.units[0];
+  const dest = reachableCells(ug, sword2).filter((c) => c.manaCost === 0)[0];
+  ug = applyAction(ug, { kind: 'move', id: sword2.id, q: dest.q, r: dest.r });
+  check(ug.rng === before, 'undo: summoning and moving leave the dice untouched');
+  // …and stepping back to a stored state restores it exactly
+  let base = createGame(78, 'control', 30, 'a');
+  const snapshot = JSON.parse(JSON.stringify(base)) as GameState;
+  const bs = summonCells(base, 'a');
+  base = applyAction(base, { kind: 'summon', ut: 'healer', q: bs[0].q, r: bs[0].r });
+  check(JSON.stringify(base) !== JSON.stringify(snapshot), 'undo: the action changed the state');
+  check(JSON.stringify(snapshot) === JSON.stringify(createGame(78, 'control', 30, 'a')),
+    'undo: the stored state is the untouched one');
 }
 
 console.log(failures ? `\n${failures} FAILURES` : '\nall good');

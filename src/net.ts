@@ -21,6 +21,9 @@ export type NetMessage =
   // is what puts both peers back in lockstep.
   | { type: 'start'; seed: number; mode: GameMode; startMana: number; mapId: MapId; state?: GameState }
   | { type: 'action'; action: GameAction }
+  // both peers keep the same history stack, so a peer that takes something
+  // back just tells the other to pop too — no state travels
+  | { type: 'undo' }
   | { type: 'rematch' };
 
 interface Handlers {

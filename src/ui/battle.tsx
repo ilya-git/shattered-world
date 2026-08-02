@@ -47,14 +47,18 @@ function routeTo(u: Unit, cell: Hex, reach: Array<Hex & { n: number }>): Hex[] {
 
 const FACTION_NAME: Record<Faction, string> = { a: 'Azure Vanguard', b: 'Crimson Horde' };
 
-export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
+export function BattleScreen({ g, me, hotseat, dispatch, canUndo, onUndo, onResign }: {
   g: GameState;
   me: Faction;
   hotseat: boolean;
   dispatch: (a: GameAction) => boolean;
+  /** something taken back-able is on the stack (never an attack) */
+  canUndo: boolean;
+  onUndo: () => void;
   onResign: () => void;
 }) {
   const my: Faction = hotseat ? g.turn : me;
+  const foe: Faction = my === 'a' ? 'b' : 'a';
   const myTurn = (hotseat || g.turn === me) && !g.winner && !g.draw;
   const map = mapOf(g);
 
@@ -345,17 +349,30 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
   /* ---------- enemy threat outline ---------- */
 
   // Union of where every enemy could move-and-strike on its next turn, mana
-  // aside. Kept out of the overlay memo above so hovering a hex doesn't
-  // re-run it — it only depends on the board, not on the pointer.
-  const threat = useMemo(() => {
-    if (!showThreat || !myTurn) return undefined;
+  // aside. Shown on their turn as well as yours — watching a blow land is
+  // when you most want to see what the rest of their line covers.
+  const threatAll = useMemo(() => {
+    if (!showThreat) return undefined;
     const seen = new Map<string, Hex>();
     for (const e of g.units) {
       if (e.faction === my) continue;
       for (const c of threatCells(g, e)) seen.set(keyOf(c), c);
     }
     return seen.size > 0 ? [...seen.values()] : undefined;
-  }, [g, my, myTurn, showThreat]);
+  }, [g, my, showThreat]);
+
+  // …and pointing at one of them narrows the outline to that unit alone, so
+  // a crowded front can be read a piece at a time. The union above is the
+  // expensive half and stays off the hover path; one unit is cheap.
+  const hoveredFoe = hover
+    ? g.units.find((u) => u.q === hover.q && u.r === hover.r && u.faction !== my)
+    : undefined;
+  const threat = useMemo(() => {
+    if (!showThreat) return undefined;
+    if (!hoveredFoe) return threatAll;
+    const cs = threatCells(g, hoveredFoe);
+    return cs.length > 0 ? cs : undefined;
+  }, [g, showThreat, hoveredFoe, threatAll]);
 
   /* ---------- readiness: what can still act this turn ---------- */
 
@@ -518,7 +535,7 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
         units={units}
         sources={g.sources}
         battleMode={g.mode === 'battle'}
-        overlay={{ ...overlay, contour: threat }}
+        overlay={{ ...overlay, contour: threat, contourFocus: !!hoveredFoe }}
         tip={tip}
         onCell={onCell}
         onCellEnter={(q, r) => setHover({ q, r })}
@@ -528,6 +545,13 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
       <TopBar
         turn={{ faction: g.turn, label: turnLabel, sub: subLabel }}
         mana={{ n: g.mana[my], sub: g.mode === 'battle' ? 'mana · banked' : `mana · +${g.sources.filter((s) => s.owner === my).length} / turn` }}
+        foe={{
+          n: g.mana[foe],
+          faction: foe,
+          sub: g.mode === 'battle'
+            ? (hotseat ? FACTION_NAME[foe] : 'rival')
+            : `${hotseat ? FACTION_NAME[foe] : 'rival'} · +${g.sources.filter((s) => s.owner === foe).length}`,
+        }}
       />
 
       <div className="obj-pill">
@@ -628,6 +652,17 @@ export function BattleScreen({ g, me, hotseat, dispatch, onResign }: {
           setMsg(`Place the ${STATS[t].name} on a free portal hex.`);
         }}
       />
+      <button
+        className="undo-btn"
+        disabled={!myTurn || !canUndo}
+        title="Take back the last move, shift, summon or spell of this turn — dice cannot be unrolled"
+        onClick={() => {
+          deselect();
+          onUndo();
+        }}
+      >
+        ↶ Undo
+      </button>
       {myTurn && readyIds.length > 0 && (
         <button className="ready-counter" onClick={cycleReady} title="Jump to the next unit that can still act">
           <span className="rc-dot"></span>

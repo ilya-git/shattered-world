@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Net, type NetMessage } from './net';
 import {
-  applyAction, createGame, RuleError,
+  applyAction, createGame, RuleError, undoable,
   type GameAction, type GameMode, type GameState,
 } from './game/engine';
 import type { MapId } from './game/maps';
@@ -43,6 +43,27 @@ export default function App() {
   const netRef = useRef<Net | null>(null);
   const gameRef = useRef<GameState | null>(null);
   gameRef.current = game;
+  // States to step back through. Both peers push on the same transitions —
+  // every action passes through here, local or remote — so the two stacks
+  // stay identical and an undo needs no state on the wire.
+  const history = useRef<GameState[]>([]);
+  const [undoDepth, setUndoDepth] = useState(0);
+
+  const remember = (prev: GameState, a: GameAction) => {
+    history.current = undoable(a) ? [...history.current.slice(-39), prev] : [];
+    setUndoDepth(history.current.length);
+  };
+  const forgetHistory = () => {
+    history.current = [];
+    setUndoDepth(0);
+  };
+  const stepBack = (): GameState | null => {
+    const st = history.current;
+    if (st.length === 0) return null;
+    history.current = st.slice(0, -1);
+    setUndoDepth(history.current.length);
+    return st[st.length - 1];
+  };
   const isHostRef = useRef(isHost);
   isHostRef.current = isHost;
   const modeRef = useRef(mode);
@@ -53,6 +74,7 @@ export default function App() {
   const startLocal = (seed: number, m: GameMode, mp: MapId) => {
     clearSave(); // a fresh battle retires whatever was in the slot
     setSaved(null);
+    forgetHistory();
     setGame(createGame(seed, m, startManaFor(m), 'a', mp));
     setRematchAsked(false);
     setRoute({ s: 'battle' });
@@ -76,6 +98,7 @@ export default function App() {
       // a resuming host ships the whole state; otherwise deal from the seed
       if (!msg.state) clearSave(); // the guest's own old battle is retired too
       setSaved(null);
+      forgetHistory();
       setGame(msg.state ?? createGame(msg.seed, msg.mode, msg.startMana, 'a', msg.mapId));
       setRematchAsked(false);
       setRoute({ s: 'battle' });
@@ -83,11 +106,16 @@ export default function App() {
       const g = gameRef.current;
       if (!g) return;
       try {
-        setGame(applyAction(g, msg.action));
+        const next = applyAction(g, msg.action);
+        remember(g, msg.action);
+        setGame(next);
       } catch (e) {
         // states diverged or a stray message — surface it rather than desync
         console.error('remote action rejected', msg.action, e);
       }
+    } else if (msg.type === 'undo') {
+      const prev = stepBack();
+      if (prev) setGame(prev);
     } else if (msg.type === 'rematch') {
       if (isHostRef.current) {
         // guest asked for a rematch — host deals the next battle
@@ -163,6 +191,7 @@ export default function App() {
     if (!g) return false;
     try {
       const next = applyAction(g, a);
+      remember(g, a);
       setGame(next);
       if (!hotseat) netRef.current?.send({ type: 'action', action: a });
       return true;
@@ -170,6 +199,14 @@ export default function App() {
       if (e instanceof RuleError) return false;
       throw e;
     }
+  };
+
+  /** Take back the last action of this turn; the peer pops its own stack. */
+  const undo = (): void => {
+    const prev = stepBack();
+    if (!prev) return;
+    setGame(prev);
+    if (!hotseat) netRef.current?.send({ type: 'undo' });
   };
 
   const toTitle = () => {
@@ -241,6 +278,7 @@ export default function App() {
               type: 'start', seed: resume.rng, mode: resume.mode,
               startMana: resume.startMana, mapId: resume.mapId, state: resume,
             });
+            forgetHistory();
             setGame(resume);
             setResume(null);
             setRematchAsked(false);
@@ -286,6 +324,8 @@ export default function App() {
         me={me}
         hotseat={hotseat}
         dispatch={dispatch}
+        canUndo={undoDepth > 0}
+        onUndo={undo}
         onResign={() => dispatch({ kind: 'resign', faction: me })}
       />
     );

@@ -106,6 +106,13 @@ html, body { margin: 0; padding: 0; }
 .wc-gem { color: var(--wc-gem); font-size: 16px; align-self: center; }
 .wc-mana-n { font-size: 25px; }
 .wc-mana-s { font-size: 12px; font-style: italic; opacity: .62; }
+/* both purses side by side; the rival's reads quieter than your own */
+.wc-mana-pair { display: flex; align-items: baseline; gap: 16px; }
+.wc-mana.foe { opacity: .62; padding-left: 16px; border-left: 1px solid var(--wc-ink-soft); }
+.wc-mana.foe .wc-mana-n { font-size: 19px; }
+.wc-mana.foe .wc-dot { align-self: center; }
+/* keep the wordmark centred no matter how wide the readouts get */
+.wc-wordmark { position: absolute; left: 50%; transform: translateX(-50%); }
 
 .wc-card { right: 18px; top: 86px; width: 238px; padding: 15px; display: flex; flex-direction: column; gap: 12px; }
 .wc-card-head { display: flex; gap: 12px; align-items: center; }
@@ -222,6 +229,9 @@ html, body { margin: 0; padding: 0; }
   stroke-dasharray: 6 4; }
 .skin-pix .threat-svg line { stroke: rgba(196,58,42,.9); stroke-width: 2.6; stroke-linecap: butt;
   stroke-dasharray: 5 3; }
+/* one unit's reach, picked out of the line: solid and a shade heavier */
+.threat-svg.focus line { stroke: rgba(181,80,62,.95); stroke-width: 2.8; stroke-dasharray: none; }
+.skin-pix .threat-svg.focus line { stroke: rgba(196,58,42,1); stroke-width: 3.2; stroke-dasharray: none; }
 
 /* impassable cliff edges (elevation difference > 1 grade), both skins */
 .cliff-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; overflow: visible; }
@@ -427,8 +437,17 @@ html, body { margin: 0; padding: 0; }
   50% { box-shadow: 0 5px 16px rgba(0,0,0,.18), 0 0 0 3px rgba(181,80,62,.4), 0 0 26px 8px rgba(181,80,62,.55); }
 }
 
+/* take back the last bloodless action of the turn */
+.undo-btn { position: absolute; z-index: 10; right: 18px; bottom: 70px;
+  width: 140px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--wc-paper); border: 1.4px solid var(--wc-ink); border-radius: 4px;
+  font-family: 'IM Fell English', serif; font-size: 12.5px; color: var(--wc-ink); cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,.12); }
+.undo-btn:hover:not(:disabled) { background: #fff; }
+.undo-btn:disabled { opacity: .35; cursor: not-allowed; }
+
 /* units that can still act this turn */
-.ready-counter { position: absolute; z-index: 10; right: 18px; bottom: 70px;
+.ready-counter { position: absolute; z-index: 10; right: 18px; bottom: 110px;
   height: 32px; min-width: 140px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;
   background: var(--wc-paper); border: 1.4px solid var(--wc-ink); border-radius: 16px;
   padding: 0 13px; font-family: 'IM Fell English', serif; font-size: 12.5px; color: var(--wc-ink);
@@ -516,7 +535,7 @@ html, body { margin: 0; padding: 0; }
 .skin-pix button { border-radius: 0 !important; font-family: 'VT323', monospace; font-style: normal; }
 .skin-pix .wc-act, .skin-pix .menu-btn, .skin-pix .wc-summon, .skin-pix .skin-toggle,
 .skin-pix .resign-btn, .skin-pix .log-btn, .skin-pix .ready-counter,
-.skin-pix .threat-btn, .skin-pix .ghost-btn, .skin-pix .lobby-back,
+.skin-pix .undo-btn, .skin-pix .threat-btn, .skin-pix .ghost-btn, .skin-pix .lobby-back,
 .skin-pix .copy-btn, .skin-pix .obtn, .skin-pix .mode {
   background: #c9b78d; border: 2px solid #5a3818; color: #2c2014;
   box-shadow: inset 2px 2px 0 rgba(255,255,255,.45), inset -2px -2px 0 rgba(90,56,24,.45); opacity: 1; }
