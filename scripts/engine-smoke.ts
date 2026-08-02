@@ -319,5 +319,20 @@ check(STATS.defender.life === 8, 'defender life 8 (house rule)');
   );
 }
 
+// ---- state stays plain data: the save slot and the resume handshake both
+//      ship a whole GameState through JSON ----
+{
+  let sg = createGame(31, 'control', 30, 'a');
+  const slot = summonCells(sg, 'a');
+  sg = applyAction(sg, { kind: 'summon', ut: 'swordsman', q: slot[0].q, r: slot[0].r });
+  const trip = JSON.parse(JSON.stringify(sg)) as GameState;
+  check(JSON.stringify(trip) === JSON.stringify(sg), 'save: state survives a JSON round-trip');
+  // …and a resumed copy must replay exactly like the original, dice included
+  const seq: GameAction[] = [{ kind: 'endTurn' }, { kind: 'endTurn' }];
+  let a = sg, b = trip;
+  for (const act of seq) { a = applyAction(a, act); b = applyAction(b, act); }
+  check(JSON.stringify(a) === JSON.stringify(b), 'save: a resumed state replays identically');
+}
+
 console.log(failures ? `\n${failures} FAILURES` : '\nall good');
 process.exit(failures ? 1 : 0);

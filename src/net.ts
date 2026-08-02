@@ -11,12 +11,15 @@
 // relay — see the README.)
 
 import Peer, { type DataConnection } from 'peerjs';
-import type { GameAction, GameMode } from './game/engine';
+import type { GameAction, GameMode, GameState } from './game/engine';
 import type { MapId } from './game/maps';
 
 export type NetMessage =
   | { type: 'lobby'; mode: GameMode; mapId: MapId }
-  | { type: 'start'; seed: number; mode: GameMode; startMana: number; mapId: MapId }
+  // `state` is set only when the host resumes a saved battle: the guest
+  // adopts it verbatim instead of dealing a fresh game from the seed, which
+  // is what puts both peers back in lockstep.
+  | { type: 'start'; seed: number; mode: GameMode; startMana: number; mapId: MapId; state?: GameState }
   | { type: 'action'; action: GameAction }
   | { type: 'rematch' };
 

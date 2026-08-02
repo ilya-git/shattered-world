@@ -8,6 +8,7 @@ import { Icon, UnitPic } from './icons';
 import type { Faction, UnitType } from '../game/data';
 import { mapOf, type FactionStats, type GameMode, type GameState } from '../game/engine';
 import { MAPS, MAP_LIST, type MapId } from '../game/maps';
+import type { SavedGame } from '../save';
 
 /* ---------- hero board: a staged mid-game scene as title art ---------- */
 
@@ -134,6 +135,53 @@ export function HostScreen({ code, error, onBack }: { code: string | null; error
   );
 }
 
+/* ---------- resume: pick up an unfinished battle, or start over ---------- */
+
+const MODE_NAME: Record<GameMode, string> = {
+  control: 'Control', gathering: 'The Gathering', battle: 'Battle',
+};
+
+export function ResumeScreen({ saved, onContinue, onNew, onBack }: {
+  saved: SavedGame;
+  onContinue: () => void;
+  onNew: () => void;
+  onBack: () => void;
+}) {
+  const g = saved.state;
+  const when = new Date(saved.savedAt);
+  const units = (f: Faction) => g.units.filter((u) => u.faction === f).length;
+  return (
+    <Screen className="lobby-screen" label="Resume">
+      <LobbyHead title="Host Game" sub="a battle was left unfinished" onBack={onBack} />
+      <div className="lobby-body">
+        <div className="wc-panel host-card resume-card">
+          <div className="host-l">your last battle</div>
+          <div className="resume-grid">
+            <span><i>map</i>{MAPS[g.mapId].name}</span>
+            <span><i>contest</i>{MODE_NAME[g.mode]}</span>
+            <span><i>turn</i>{g.turnNum}</span>
+            <span><i>to move</i>{g.turn === 'a' ? 'Azure Vanguard' : 'Crimson Horde'}</span>
+            <span><i>azure</i>{units('a')} units · ✦{g.mana.a}</span>
+            <span><i>crimson</i>{units('b')} units · ✦{g.mana.b}</span>
+          </div>
+          <div className="host-hint">
+            saved {when.toLocaleDateString()} at {when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {saved.hotseat ? ' · from a hotseat table' : ''}
+          </div>
+        </div>
+        <div className="resume-picks">
+          <button className="start-btn" onClick={onContinue}>Continue previous game →</button>
+          <button className="ghost-btn wide" onClick={onNew}>New game</button>
+        </div>
+      </div>
+      <div className="lobby-foot">
+        <button className="ghost-btn" onClick={onBack}>Back</button>
+        <span className="foot-note">continuing deals the saved position to whoever joins</span>
+      </div>
+    </Screen>
+  );
+}
+
 /* ---------- join ---------- */
 
 export function JoinScreen({ connecting, error, onConnect, onBack }: { connecting: boolean; error: string | null; onConnect: (code: string) => void; onBack: () => void }) {
@@ -181,7 +229,7 @@ export const MODES: Array<{ id: GameMode; t: string; s: string }> = [
   { id: 'battle', t: 'Battle', s: 'no sources — annihilate the enemy' },
 ];
 
-export function WarRoom({ isHost, code, mode, onMode, mapId, onMap, onStart, onBack }: {
+export function WarRoom({ isHost, code, mode, onMode, mapId, onMap, onStart, onBack, resume }: {
   isHost: boolean;
   code: string;
   mode: GameMode;
@@ -190,6 +238,8 @@ export function WarRoom({ isHost, code, mode, onMode, mapId, onMap, onStart, onB
   onMap: (m: MapId) => void;
   onStart: () => void;
   onBack: () => void;
+  /** set when the host is picking a saved battle back up — settings are fixed */
+  resume?: { turnNum: number } | null;
 }) {
   const startMana = mode === 'battle' ? 200 : 30;
   return (
@@ -217,7 +267,7 @@ export function WarRoom({ isHost, code, mode, onMode, mapId, onMap, onStart, onB
                 <button
                   key={m.id}
                   className={'mode' + (mapId === m.id ? ' on' : '')}
-                  disabled={!isHost}
+                  disabled={!isHost || !!resume}
                   onClick={() => onMap(m.id)}
                 >
                   <span className="mode-t">{m.name}</span>
@@ -227,13 +277,15 @@ export function WarRoom({ isHost, code, mode, onMode, mapId, onMap, onStart, onB
             </div>
           </div>
           <div className="lobby-rules-mini">
-            <div className="lrm-h">{isHost ? 'choose the contest' : 'this table'}</div>
+            <div className="lrm-h">
+              {resume ? `resuming · turn ${resume.turnNum}` : isHost ? 'choose the contest' : 'this table'}
+            </div>
             <div className="mode-pick" style={{ flexDirection: 'column' }}>
               {MODES.map((m) => (
                 <button
                   key={m.id}
                   className={'mode' + (mode === m.id ? ' on' : '')}
-                  disabled={!isHost}
+                  disabled={!isHost || !!resume}
                   onClick={() => onMode(m.id)}
                 >
                   <span className="mode-t">{m.t}</span>
@@ -251,7 +303,9 @@ export function WarRoom({ isHost, code, mode, onMode, mapId, onMap, onStart, onB
       <div className="lobby-foot">
         <button className="ghost-btn" onClick={onBack}>Leave</button>
         {isHost ? (
-          <button className="start-btn" onClick={onStart}>Start Battle →</button>
+          <button className="start-btn" onClick={onStart}>
+            {resume ? 'Resume Battle →' : 'Start Battle →'}
+          </button>
         ) : (
           <span className="wait-row"><span className="spinner"></span><span className="wait-t">The host is choosing the battle…</span></span>
         )}

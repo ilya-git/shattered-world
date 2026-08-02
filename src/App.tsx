@@ -10,12 +10,14 @@ import {
 } from './game/engine';
 import type { MapId } from './game/maps';
 import type { Faction } from './game/data';
+import { clearSave, loadSave, saveGame, type SavedGame } from './save';
 import { BattleScreen } from './ui/battle';
-import { HostScreen, JoinScreen, OutcomeScreen, RulesScreen, TitleScreen, WarRoom } from './ui/screens';
+import { HostScreen, JoinScreen, OutcomeScreen, ResumeScreen, RulesScreen, TitleScreen, WarRoom } from './ui/screens';
 
 type Route =
   | { s: 'title' }
   | { s: 'rules' }
+  | { s: 'resume' }
   | { s: 'host' }
   | { s: 'join' }
   | { s: 'warroom' }
@@ -34,6 +36,9 @@ export default function App() {
   const [mapId, setMapId] = useState<MapId>('isle');
   const [game, setGame] = useState<GameState | null>(null);
   const [rematchAsked, setRematchAsked] = useState(false);
+  /** the saved battle the host chose to continue, until it is dealt out */
+  const [resume, setResume] = useState<GameState | null>(null);
+  const [saved, setSaved] = useState<SavedGame | null>(null);
 
   const netRef = useRef<Net | null>(null);
   const gameRef = useRef<GameState | null>(null);
@@ -51,6 +56,13 @@ export default function App() {
     setRoute({ s: 'battle' });
   };
 
+  // mirror every state change into the save slot; a finished battle clears it
+  useEffect(() => {
+    if (!game) return;
+    if (game.winner || game.draw) clearSave();
+    else saveGame(game, hotseat);
+  }, [game, hotseat]);
+
   const handleMessage = (msg: NetMessage) => {
     if (msg.type === 'lobby') {
       // host's war-room choices, mirrored read-only on the guest
@@ -59,7 +71,8 @@ export default function App() {
     } else if (msg.type === 'start') {
       setMode(msg.mode);
       setMapId(msg.mapId);
-      setGame(createGame(msg.seed, msg.mode, msg.startMana, 'a', msg.mapId));
+      // a resuming host ships the whole state; otherwise deal from the seed
+      setGame(msg.state ?? createGame(msg.seed, msg.mode, msg.startMana, 'a', msg.mapId));
       setRematchAsked(false);
       setRoute({ s: 'battle' });
     } else if (msg.type === 'action') {
@@ -112,6 +125,28 @@ export default function App() {
 
   useEffect(() => () => netRef.current?.close?.(), []);
 
+  /** open a room; `carry` is the saved battle to resume, or null for a fresh one */
+  const beginHost = async (carry: GameState | null) => {
+    setHotseat(false);
+    setIsHost(true);
+    setNetError(null);
+    setResume(carry);
+    if (carry) {
+      setMode(carry.mode);
+      setMapId(carry.mapId);
+      modeRef.current = carry.mode;
+      mapRef.current = carry.mapId;
+    }
+    setRoute({ s: 'host' });
+    const net = makeNet();
+    try {
+      const c = await net.host();
+      setCode(c);
+    } catch {
+      /* error already surfaced via onError */
+    }
+  };
+
   /* ---------- local dispatch: validate, apply, relay ---------- */
 
   const dispatch = (a: GameAction): boolean => {
@@ -134,12 +169,25 @@ export default function App() {
     setCode(null);
     setNetError(null);
     setConnecting(false);
+    setResume(null);
+    setSaved(null);
     setRoute({ s: 'title' });
   };
 
   /* ---------- routes ---------- */
 
   if (route.s === 'rules') return <RulesScreen onBack={toTitle} />;
+
+  if (route.s === 'resume' && saved) {
+    return (
+      <ResumeScreen
+        saved={saved}
+        onContinue={() => void beginHost(saved.state)}
+        onNew={() => void beginHost(null)}
+        onBack={toTitle}
+      />
+    );
+  }
 
   if (route.s === 'host') {
     return <HostScreen code={code} error={netError} onBack={toTitle} />;
@@ -176,7 +224,20 @@ export default function App() {
           if (!hotseat) netRef.current?.send({ type: 'lobby', mode, mapId: m });
         }}
         onBack={toTitle}
+        resume={resume ? { turnNum: resume.turnNum } : null}
         onStart={() => {
+          if (resume) {
+            // hand the guest the exact state so both sides resume in lockstep
+            netRef.current?.send({
+              type: 'start', seed: resume.rng, mode: resume.mode,
+              startMana: resume.startMana, mapId: resume.mapId, state: resume,
+            });
+            setGame(resume);
+            setResume(null);
+            setRematchAsked(false);
+            setRoute({ s: 'battle' });
+            return;
+          }
           const seed = (Math.random() * 0x7fffffff) | 0;
           netRef.current?.send({ type: 'start', seed, mode, startMana: startManaFor(mode), mapId });
           startLocal(seed, mode, mapId);
@@ -232,18 +293,15 @@ export default function App() {
         netRef.current = null;
         setCode('hotseat · one table');
       }}
-      onHost={async () => {
-        setHotseat(false);
-        setIsHost(true);
-        setNetError(null);
-        setRoute({ s: 'host' });
-        const net = makeNet();
-        try {
-          const c = await net.host();
-          setCode(c);
-        } catch {
-          /* error already surfaced via onError */
+      onHost={() => {
+        // a battle left unfinished gets the choice of picking it back up
+        const s = loadSave();
+        if (s) {
+          setSaved(s);
+          setRoute({ s: 'resume' });
+          return;
         }
+        void beginHost(null);
       }}
       onJoin={() => {
         setHotseat(false);
