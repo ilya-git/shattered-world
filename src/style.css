@@ -509,18 +509,37 @@ html, body { margin: 0; padding: 0; }
   box-shadow: inset 0 0 0 2px #d9a441, 0 4px 0 rgba(0,0,0,.30); }
 .skin-pix .wc-panel::before { display: none; }
 
-/* buttons go blocky: bevel via inset shadows, no round corners */
+/* buttons go blocky: bevel via inset shadows, no round corners.
+   every outline-only control of the wash skin is listed here too: a chip
+   that reads as "quiet ink on parchment" turns into a hole once the wood
+   frames and the pixel board sit behind it, so they all take a solid fill */
 .skin-pix button { border-radius: 0 !important; font-family: 'VT323', monospace; font-style: normal; }
 .skin-pix .wc-act, .skin-pix .menu-btn, .skin-pix .wc-summon, .skin-pix .skin-toggle,
-.skin-pix .resign-btn, .skin-pix .log-btn, .skin-pix .ready-counter {
+.skin-pix .resign-btn, .skin-pix .log-btn, .skin-pix .ready-counter,
+.skin-pix .threat-btn, .skin-pix .ghost-btn, .skin-pix .lobby-back,
+.skin-pix .copy-btn, .skin-pix .obtn, .skin-pix .mode {
   background: #c9b78d; border: 2px solid #5a3818; color: #2c2014;
   box-shadow: inset 2px 2px 0 rgba(255,255,255,.45), inset -2px -2px 0 rgba(90,56,24,.45); opacity: 1; }
-.skin-pix .wc-act.primary { background: #d9a441; }
+/* picked / active states: gold instead of the wash skin's accent outline,
+   which the fill above would otherwise swallow */
+.skin-pix .wc-act.primary, .skin-pix .mode.on, .skin-pix .threat-btn.on { background: #d9a441;
+  border-color: #5a3818; color: #2c2014;
+  box-shadow: inset 2px 2px 0 rgba(255,255,255,.45), inset -2px -2px 0 rgba(90,56,24,.45); }
 .skin-pix .wc-act:disabled, .skin-pix .wc-summon:disabled { opacity: .45; }
+.skin-pix .mode:disabled { opacity: .8; }
 .skin-pix .endturn-btn { background: #a03020; border: 2px solid #3c1008; color: #ffe8c0;
   box-shadow: inset 2px 2px 0 rgba(255,255,255,.25), inset -2px -2px 0 rgba(0,0,0,.35); }
-.skin-pix .menu-btn.primary { background: #a03020; color: #ffe8c0; }
+.skin-pix .menu-btn.primary, .skin-pix .obtn.primary { background: #a03020; color: #ffe8c0; }
+/* the defeat screen recolors its buttons for the dark scrim; the pix fill is
+   light, so put the ink frame and label back */
+.skin-pix.outcome.lose .obtn { border-color: #5a3818; }
+.skin-pix.outcome.lose .obtn.ghost { color: #2c2014; }
 .skin-pix .mb-ic { border-radius: 0; border: 2px solid currentColor; }
+
+/* fields & icon frames: sunken pixel wells, not dashed or 2%-ink ghosts */
+.skin-pix .code, .skin-pix .code-field { background: #f0e6cd; border: 2px solid #5a3818;
+  border-radius: 0; box-shadow: inset 2px 2px 0 rgba(90,56,24,.30); }
+.skin-pix .rule-ic { background: #c9b78d; border: 2px solid #5a3818; border-radius: 0; }
 
 /* tokens: no stand — transparent sprites straight on the tile, exactly one
    tile-height tall (faction reads from the sprite colors; selection stays circular) */
